@@ -1,9 +1,9 @@
-Tasks:
-1. Formula: NumMACs(layer) = Nodes(layer) * Nodes(layer-1)
-   Results:
-   Layer 1: Nodes(layer1) = 256, Nodes(layer0) = 784, so NumMACs(layer1) = 256 * 784 = 200,704
-   Layer 2: Nodes(layer2) = 128, Nodes(layer1) = 256, so NumMACs(layer2) = 128 * 256 = 32,768
-   Layer 3: Nodes(layer3) = 10,  Nodes(layer2) = 128, so NumMACs(layer3) = 10  * 128 = 1280
+Tasks:  
+1. Formula: NumMACs(layer) = Nodes(layer) * Nodes(layer-1)  
+   Results:  
+   Layer 1: Nodes(layer1) = 256, Nodes(layer0) = 784, so NumMACs(layer1) = 256 * 784 = 200,704  
+   Layer 2: Nodes(layer2) = 128, Nodes(layer1) = 256, so NumMACs(layer2) = 128 * 256 = 32,768  
+   Layer 3: Nodes(layer3) = 10,  Nodes(layer2) = 128, so NumMACs(layer3) = 10  * 128 = 1280  
    
 2. Total MACs = 200,704 + 32,768 + 1280 = 234,752.
 
