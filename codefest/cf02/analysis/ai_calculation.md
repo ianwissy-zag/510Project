@@ -1,5 +1,6 @@
 The dominant kernels for my algorithm are the matmul_foward and matmul_backwards functions. They collectively take up 82% of the runtime of the program. They are considered together, as they are essentially identical in terms of functionality. For arithmetic intensity calculations, the forward function is used, as it takes up more runtime than the matmul_backwards function. The function is: 
 
+```
 void matmul_forward(float* out,
                     const float* inp, const float* weight, const float* bias,
                     int B, int T, int C, int OC) {
@@ -46,6 +47,7 @@ void matmul_forward(float* out,
         }
     }
 }
+```
 
 For square matrix multiplication, arithmetic intensity goes as N/6, where N is the width/length of the matrix. This function multiplies rectangular matrices, so the computation is more complicated. 
 
