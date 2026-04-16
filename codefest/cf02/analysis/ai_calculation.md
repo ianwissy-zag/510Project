@@ -63,6 +63,9 @@ This resolves to:
 
 AI = 267 FLOPs/Byte.
 
+
+Note: If it is assumed that no caching is used and that every access goes to DRAM, the above calculation is incorrect. In this case, every matrix element must be accessed for every computation, which means that two loads must be done for every multiply and accumulate. Therefore for a large matrix, the approximate arithmetic intensity goes as 2/(2 * 4), for 32 bit (4 byte) FP operands, or .25 FLOPs/Byte. Actual execution exceeds the throughput that would be associated with this computed arithmetic intensity, so it is assumed that efficient caching is used, and that the AI of 267 FLOP/B is the more accurate choice to use when determining throughput limits. 
+
 Roofline Analysis: There is no assigned document to place the analysis behind the roofline model graph, so I am including it in this one.
 
 My processor is a 4-core 1.6GHz Intel i5-8250. The computed max throughput for this processor is 204.8 GFLOPs/s. My memory is 2400MT/s DDR4, with a computed maximum transfer rate of 38.4 GB/s. 
