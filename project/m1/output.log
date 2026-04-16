@@ -1,0 +1,79 @@
+[GPT-2]
+max_seq_len: 1024
+vocab_size: 50257
+padded_vocab_size: 50304
+num_layers: 12
+num_heads: 12
+channels: 768
+num_parameters: 124475904
+train dataset num_batches: 1192
+val dataset num_batches: 128
+num_activations: 73347840
+val loss 5.325522
+step 0: train loss 4.677772 (took 6788.819220 ms)
+step 1: train loss 5.191520 (took 5203.658410 ms)
+step 2: train loss 4.438628 (took 4120.497995 ms)
+step 3: train loss 4.138455 (took 4084.904534 ms)
+step 4: train loss 4.144234 (took 4828.543603 ms)
+step 5: train loss 3.834684 (took 4890.938349 ms)
+step 6: train loss 4.298057 (took 5524.937571 ms)
+step 7: train loss 4.280748 (took 5335.761769 ms)
+step 8: train loss 4.249753 (took 5414.159877 ms)
+step 9: train loss 4.391605 (took 5056.574331 ms)
+val loss 4.416494
+step 10: train loss 3.912613 (took 4626.517264 ms)
+step 11: train loss 3.737813 (took 4483.031909 ms)
+step 12: train loss 3.840918 (took 4551.708372 ms)
+step 13: train loss 4.367943 (took 4912.573521 ms)
+step 14: train loss 4.130485 (took 6401.138874 ms)
+step 15: train loss 4.012578 (took 5506.675155 ms)
+step 16: train loss 3.796071 (took 4888.297748 ms)
+step 17: train loss 4.355926 (took 4889.580313 ms)
+step 18: train loss 3.766852 (took 4965.980567 ms)
+step 19: train loss 4.552071 (took 5038.713054 ms)
+val loss 4.329332
+generating:
+---
+
+I am pale and ill-smyth'd:
+Quoth the poor rascal, 'twas now on
+What should have been my way?'
+I mean,
+I must head home to New Hamporn as well as my own.
+
+<|endoftext|>SAMUSIO:
+If my luck outweighs
+---
+step 20: train loss 4.527330 (took 5052.730620 ms)
+step 21: train loss 4.065797 (took 4812.561058 ms)
+step 22: train loss 3.965316 (took 5022.863001 ms)
+step 23: train loss 3.449410 (took 4792.777763 ms)
+step 24: train loss 4.490954 (took 5516.326425 ms)
+step 25: train loss 4.035361 (took 5558.730822 ms)
+step 26: train loss 3.445302 (took 4824.772718 ms)
+step 27: train loss 3.993788 (took 5874.431977 ms)
+step 28: train loss 4.199468 (took 5526.731700 ms)
+step 29: train loss 4.538460 (took 4735.441088 ms)
+val loss 4.300248
+step 30: train loss 4.306292 (took 5456.545415 ms)
+step 31: train loss 4.851407 (took 5974.559577 ms)
+step 32: train loss 4.577480 (took 5765.972655 ms)
+step 33: train loss 4.124943 (took 5292.841669 ms)
+step 34: train loss 4.330320 (took 5067.537774 ms)
+step 35: train loss 3.399417 (took 5866.022868 ms)
+step 36: train loss 3.661206 (took 5401.484312 ms)
+step 37: train loss 3.330452 (took 5438.150628 ms)
+step 38: train loss 3.567853 (took 5352.906315 ms)
+step 39: train loss 3.902003 (took 6040.037763 ms)
+val loss 4.291717
+generating:
+---
+EditBOOK IX:
+Under the boasted sute of Georges:
+So lordly is the prize had sin is high;
+Hell is the way to God: frankish friends from blessed daughters
+To Bermuda have heard the saying,
+Then how to place the artscape.
+Strong should a bellow
+---
+step 40: train loss 3.952987 (took 5579.776175 ms)
