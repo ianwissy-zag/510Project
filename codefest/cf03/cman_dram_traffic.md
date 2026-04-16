@@ -1,0 +1,10 @@
+Tasks:
+1) Computing one output element C[i][j] in NxN matrix multiplication requires accessing each element in the ith row of A and the jth column of B, for a total of 2N memory accesses. Therefore for the full NxN multiplication, a total of N^2 * 2N = 2N^3 memory accesses must be performed. In this case N = 32, so the total number of memory accesses is 2 * 32^3 = 2^16. Since matrix elements are FP32s, they are 4 bytes each, so the total DRAM traffic is 4 * 2^16 = 2^18 = 262144.
+
+2) The intention behind tiling is that elements in each tile only need to be read from memory to perform the computations associated with that tile, at which point they are never reused. For each tile, the number of DRAM accesses required still goes as 2T^3, so the required DRAM traffic for each tile is 4 * 2T^3 = 8 * 8^3 = 2^12. The number of tiles goes as (N/T)^2, which in this case is (32/8)^2 = 4^2 = 16. Therefore the total DRAM traffic is 2^12 * 16 = 2^16 = 65536. 
+
+3) The ratio of DRAM traffic is 2^18/2^16 = 4 = N/T. This is unsurprising if you consider the formula used to calculate them. The naive approach requires 2N^3 data accesses, whereas the tiled version requires 2T^3/(N/T)^2 = 2T/N^2. The ratio is then 2N^3/(2T/N^2) = N/T.
+
+4) Naive: The execution time will be the maximum of the data traffic divided by the memory bandwidth and the computations required divided by the compute. If the DRAM bandwidth is 320 GB/s and the compute is 10 TFLOP/s, then the execution time will be max(2^18 Bytes / 320 GB/s, 2*32^3 FLOP / 10 TFLOP/s) = max(8.192 * 10^-7 s, 6.55 * 10^-9 s) = 8.192 * 10^-7 s. Since the memory time was greater than the compute time, this execution is memory bound.
+
+Tiled: For the tiled version, the compute is the same, but the memory traffic is reduced by a factor of N/T = 4. Therefore the memory time will also be reduced by the same factor to 8.192 * 10^-7 s / 4 = 2.048 * 10^-7. This number is still larger than the compute time, so the execution time is 2.048 * 10^-7 and the system is memory bound. 
