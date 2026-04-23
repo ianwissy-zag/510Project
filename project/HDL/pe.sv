@@ -1,5 +1,5 @@
 `timescale 1ns / 1ps
-
+/* verilator lint_off DECLFILENAME */
 module mac_pe #(
     parameter ACT_WIDTH = 16,   // BF16
     parameter WT_WIDTH  = 16,   // BF16
@@ -23,7 +23,15 @@ module mac_pe #(
 );
 
     // Internal weight register
-    logic [WT_WIDTH-1:0] weight_reg;
+    logic [WT_WIDTH-1:0]   weight_reg;
+    logic [PSUM_WIDTH-1:0] mac_result;
+
+    bf16_mac_unit u_mac (
+        .act_bf16    (a_in),
+        .wt_bf16     (weight_reg),
+        .acc_fp32_in (psum_in),
+        .acc_fp32_out(mac_result)
+    );
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -33,21 +41,11 @@ module mac_pe #(
             psum_out   <= '0;
         end else begin
             if (load_wt) begin
-                // Shift phase: weights flow top-to-bottom
                 weight_reg <= w_in;
-                w_out      <= weight_reg; // Pass previous weight down
+                w_out      <= weight_reg;
             end else begin
-                // Compute phase: pipeline the activation
-                a_out <= a_in;
-                
-                // ---------------------------------------------------------
-                // TODO: REPLACE WITH ACTUAL BF16/FP32 IP CORES
-                // ---------------------------------------------------------
-                // Logically: psum_out <= psum_in + (a_in * weight_reg);
-                // The below is a placeholder that will synthesize as integer math.
-                // You must instantiate a BF16 multiplier and FP32 adder here.
-                psum_out <= psum_in + (a_in * weight_reg); 
-                // ---------------------------------------------------------
+                a_out    <= a_in;
+                psum_out <= mac_result;
             end
         end
     end

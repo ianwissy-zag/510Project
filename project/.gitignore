@@ -1,0 +1,14 @@
+# Verilator build output directories
+obj_*/
+obj_dir/
+
+# OpenLane run outputs
+runs/
+
+# Compiled binaries and object files
+*.o
+*.a
+*.d
+
+# Verilator-generated C++ (keep .sv and .cpp sources, not generated intermediates)
+# (already covered by obj_*/)

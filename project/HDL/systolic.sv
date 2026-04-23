@@ -1,3 +1,4 @@
+/* verilator lint_off DECLFILENAME */
 module systolic_array_32x32 #(
     parameter ARRAY_SIZE = 32,
     parameter ACT_WIDTH  = 16,
@@ -10,12 +11,12 @@ module systolic_array_32x32 #(
     input  logic load_wt, // Control signal to load weights
     
     // Edge inputs
-    input  logic [ACT_WIDTH-1:0]  act_in [ARRAY_SIZE-1:0],  // Activations entering left edge
-    input  logic [WT_WIDTH-1:0]   wt_in  [ARRAY_SIZE-1:0],  // Weights entering top edge (during load)
-    input  logic [PSUM_WIDTH-1:0] psum_in[ARRAY_SIZE-1:0],  // Initial Psums entering top edge (usually 0)
-    
+    input  logic [ARRAY_SIZE-1:0][ACT_WIDTH-1:0]  act_in,   // Activations entering left edge
+    input  logic [ARRAY_SIZE-1:0][WT_WIDTH-1:0]   wt_in,    // Weights entering top edge (during load)
+    input  logic [ARRAY_SIZE-1:0][PSUM_WIDTH-1:0] psum_in,  // Initial Psums entering top edge (usually 0)
+
     // Edge outputs
-    output logic [PSUM_WIDTH-1:0] psum_out[ARRAY_SIZE-1:0]  // Final accumulated results exiting bottom
+    output logic [ARRAY_SIZE-1:0][PSUM_WIDTH-1:0] psum_out  // Final accumulated results exiting bottom
 );
 
     // ---------------------------------------------------------

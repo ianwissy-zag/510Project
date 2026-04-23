@@ -1,19 +1,24 @@
 `timescale 1ns / 1ps
+/* verilator lint_off DECLFILENAME */
+// tuser encoding (2 bits, carried on every beat):
+//   tuser[1] : destination  – 0 = weight SRAM,  1 = activation SRAM
+//   tuser[0] : buffer select – 0 = ping (buf 0), 1 = pong (buf 1)
+//
+//   2'b00 = weight ping   2'b01 = weight pong
+//   2'b10 = act ping      2'b11 = act pong
 
 module axis_to_pingpong_buffer #(
     parameter AXI_DATA_WIDTH = 512, // 32 elements of 16-bit BF16
+    parameter TUSER_WIDTH    = 2,   // routing metadata embedded in stream
     parameter SRAM_DEPTH     = 32,  // 32 rows to fill a 32x32 array
     parameter ADDR_WIDTH     = $clog2(SRAM_DEPTH) // 5 bits for 32 depth
 )(
     input  logic clk,
     input  logic rst_n,
-    
-    // Control interface (from a lightweight AXI-Lite config register)
-    input  logic       cfg_dest_is_weight, // 1 = Writing Weights, 0 = Writing Activations
-    input  logic       cfg_ping_pong_sel,  // 0 = Write to Ping (Buffer 0), 1 = Write to Pong (Buffer 1)
-    
+
     // AXI4-Stream Slave Interface
     input  logic [AXI_DATA_WIDTH-1:0] s_axis_tdata,
+    input  logic [TUSER_WIDTH-1:0]    s_axis_tuser,  // destination routing
     input  logic                      s_axis_tvalid,
     output logic                      s_axis_tready,
     input  logic                      s_axis_tlast, // Indicates end of a 32-beat packet
@@ -31,65 +36,62 @@ module axis_to_pingpong_buffer #(
     output logic [AXI_DATA_WIDTH-1:0] act_data
 );
 
-    // Internal write address counter
-    logic [ADDR_WIDTH-1:0] write_ptr;
-    
-    // Handshake condition: Data is transferred when both valid and ready are high
+    logic [ADDR_WIDTH-1:0]  write_ptr;
+    logic [TUSER_WIDTH-1:0] routing;     // tuser latched from first beat of packet
+
     logic axis_handshake;
     assign axis_handshake = s_axis_tvalid && s_axis_tready;
 
-    // We are always ready to receive data unless we are held in reset
-    // (Assuming our SRAMs can write in 1 cycle, we don't need backpressure here)
-    assign s_axis_tready = rst_n; 
+    assign s_axis_tready = rst_n;
 
     // -------------------------------------------------------------------------
-    // Address Counter Logic
+    // Routing latch – capture tuser on the first beat (write_ptr == 0).
+    // active_routing bypasses the latch on beat 0 so the correct write enable
+    // fires immediately without waiting for the register to update.
     // -------------------------------------------------------------------------
     always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
+        if (!rst_n)
+            routing <= '0;
+        else if (axis_handshake && write_ptr == '0)
+            routing <= s_axis_tuser;
+    end
+
+    logic [TUSER_WIDTH-1:0] active_routing;
+    assign active_routing = (write_ptr == '0) ? s_axis_tuser : routing;
+
+    // -------------------------------------------------------------------------
+    // Address Counter
+    // -------------------------------------------------------------------------
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n)
             write_ptr <= '0;
-        end else begin
-            if (axis_handshake) begin
-                if (s_axis_tlast) begin
-                    // Reset pointer at the end of the packet
-                    write_ptr <= '0;
-                end else begin
-                    // Increment pointer to write next line to SRAM
-                    write_ptr <= write_ptr + 1'b1;
-                end
-            end
-        end
+        else if (axis_handshake)
+            write_ptr <= s_axis_tlast ? '0 : write_ptr + 1'b1;
     end
 
     // -------------------------------------------------------------------------
     // Data Routing and Write Enables
+    // The data and address lines are shared; Write Enables act as the demux.
     // -------------------------------------------------------------------------
-    // The data and address lines are shared; the Write Enables act as the demux
-    
     assign wt_data  = s_axis_tdata;
     assign act_data = s_axis_tdata;
-    
+
     assign wt_addr  = write_ptr;
     assign act_addr = write_ptr;
 
     always_comb begin
-        // Default everything to zero
         wt_we_0  = 1'b0;
         wt_we_1  = 1'b0;
         act_we_0 = 1'b0;
         act_we_1 = 1'b0;
-        
-        // Only assert write enable on a valid AXI handshake
+
         if (axis_handshake) begin
-            if (cfg_dest_is_weight) begin
-                // Routing to Weight Buffers
-                if (cfg_ping_pong_sel == 1'b0) wt_we_0 = 1'b1;
-                else                           wt_we_1 = 1'b1;
-            end else begin
-                // Routing to Activation Buffers
-                if (cfg_ping_pong_sel == 1'b0) act_we_0 = 1'b1;
-                else                           act_we_1 = 1'b1;
-            end
+            case (active_routing)
+                2'b00: wt_we_0  = 1'b1;  // weight ping
+                2'b01: wt_we_1  = 1'b1;  // weight pong
+                2'b10: act_we_0 = 1'b1;  // activation ping
+                2'b11: act_we_1 = 1'b1;  // activation pong
+            endcase
         end
     end
 
