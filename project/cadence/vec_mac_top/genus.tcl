@@ -17,7 +17,12 @@ set asap7_lef_dir $asap7_root/LEF
 
 # TT corner only for synthesis — SS/FF cause cell name collisions when loaded
 # together and belong in the Innovus mmmc setup, not here.
-set lib_tt  $asap7_lib_dir/asap7sc7p5t_SIMPLE_RVT_TT_nldm_211120.lib
+# ASAP7 splits cells across five library files by type; all are needed.
+set lib_tt_simple $asap7_lib_dir/asap7sc7p5t_SIMPLE_RVT_TT_nldm_211120.lib
+set lib_tt_invbuf $asap7_lib_dir/asap7sc7p5t_INVBUF_RVT_TT_nldm_220122.lib
+set lib_tt_seq    $asap7_lib_dir/asap7sc7p5t_SEQ_RVT_TT_nldm_220123.lib
+set lib_tt_ao     $asap7_lib_dir/asap7sc7p5t_AO_RVT_TT_nldm_211120.lib
+set lib_tt_oa     $asap7_lib_dir/asap7sc7p5t_OA_RVT_TT_nldm_211120.lib
 
 # ── Genus global settings ─────────────────────────────────────────────────────
 set_db init_lib_search_path     $asap7_lib_dir
@@ -35,7 +40,7 @@ set_db syn_opt_effort       medium
 set_db auto_ungroup         none
 
 # ── Read libraries ────────────────────────────────────────────────────────────
-read_libs $lib_tt
+read_libs [list $lib_tt_simple $lib_tt_invbuf $lib_tt_seq $lib_tt_ao $lib_tt_oa]
 
 # ── Read RTL ──────────────────────────────────────────────────────────────────
 # bf16_mac_unit_core.v is Verilog 2001 (Chisel/HardFloat generated).
