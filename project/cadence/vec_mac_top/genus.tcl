@@ -15,10 +15,9 @@ set asap7_root   [file normalize $script_dir/../asap7/asap7sc7p5t_28]
 set asap7_lib_dir $asap7_root/LIB/NLDM
 set asap7_lef_dir $asap7_root/LEF
 
-# Three-corner set: TT for synthesis, SS/FF for signoff checks
+# TT corner only for synthesis — SS/FF cause cell name collisions when loaded
+# together and belong in the Innovus mmmc setup, not here.
 set lib_tt  $asap7_lib_dir/asap7sc7p5t_SIMPLE_RVT_TT_nldm_211120.lib
-set lib_ss  $asap7_lib_dir/asap7sc7p5t_SIMPLE_RVT_SS_nldm_211120.lib
-set lib_ff  $asap7_lib_dir/asap7sc7p5t_SIMPLE_RVT_FF_nldm_211120.lib
 
 # ── Genus global settings ─────────────────────────────────────────────────────
 set_db init_lib_search_path     $asap7_lib_dir
@@ -36,7 +35,7 @@ set_db syn_opt_effort       medium
 set_db auto_ungroup         none
 
 # ── Read libraries ────────────────────────────────────────────────────────────
-read_libs [list $lib_tt $lib_ss $lib_ff]
+read_libs $lib_tt
 
 # ── Read RTL ──────────────────────────────────────────────────────────────────
 # bf16_mac_unit_core.v is Verilog 2001 (Chisel/HardFloat generated).
@@ -55,6 +54,12 @@ read_hdl -sv               ../../HDL_Vect/top.sv
 # ── Elaborate ─────────────────────────────────────────────────────────────────
 elaborate vec_mac_top
 check_design -unresolved
+
+# Preserve bf16_mac_unit hierarchy — Genus-native equivalent of keep_hierarchy.
+# Prevents the 128 MAC instances from being flattened into the parent,
+# enabling hierarchical synthesis and dramatically reducing runtime.
+set_db [get_modules bf16_mac_unit]      .preserve true
+set_db [get_modules bf16_mac_unit_core] .preserve true
 
 # ── Timing constraints ────────────────────────────────────────────────────────
 # 5ns / 200MHz target — conservative for ASAP7 FP32 MAC depth.
