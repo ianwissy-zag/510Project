@@ -12,3 +12,13 @@ runs/
 
 # Verilator-generated C++ (keep .sv and .cpp sources, not generated intermediates)
 # (already covered by obj_*/)
+
+# ASAP7 PDK — third-party repo, clone separately via git submodule
+cadence/asap7/
+
+# Large source files not suitable for git
+Source/llm.c
+
+# Cadence tool outputs
+cadence/*/outputs/
+cadence/*/reports/

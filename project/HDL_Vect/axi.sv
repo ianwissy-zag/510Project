@@ -1,5 +1,4 @@
 `timescale 1ns / 1ps
-/* verilator lint_off DECLFILENAME */
 // AXI4-Stream input buffer for the 128-wide vector MAC.
 //
 // tuser encoding (same as systolic design):

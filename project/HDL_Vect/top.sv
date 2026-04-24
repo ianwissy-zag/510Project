@@ -1,5 +1,4 @@
 `timescale 1ns / 1ps
-/* verilator lint_off DECLFILENAME */
 // Top-level 128-wide vector MAC accelerator.
 //
 // Architecture contrast vs. systolic accelerator_top:

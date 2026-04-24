@@ -42,6 +42,10 @@ module vec_mac_array #(
             assign psum_out[j*PSUM_WIDTH +: PSUM_WIDTH] = acc;
 
             // Combinational BF16 MAC: mac_result = acc + act_in * wt_in[j]
+            // keep_hierarchy instructs Genus to synthesize each instance
+            // independently rather than flattening all 128 — critical for
+            // runtime and memory on repetitive datapath structures.
+            (* keep_hierarchy = "yes" *)
             bf16_mac_unit u_mac (
                 .act_bf16    (act_in),
                 .wt_bf16     (wt_in[j*WT_WIDTH +: WT_WIDTH]),
