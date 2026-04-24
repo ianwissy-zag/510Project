@@ -1,0 +1,40 @@
+{
+    "DESIGN_NAME": "vec_mac_top",
+
+    "VERILOG_FILES": [
+        "dir::../../HDL_Vect/bf16_mac_unit_core.v",
+        "dir::../../HDL_Vect/bf16_mac_unit.sv",
+        "dir::../../HDL_Vect/vec_mac_array.sv",
+        "dir::../../HDL_Vect/axi.sv",
+        "dir::../../HDL_Vect/weight_sram.sv",
+        "dir::../../HDL_Vect/act_sram.sv",
+        "dir::../../HDL_Vect/output_sram.sv",
+        "dir::../../HDL_Vect/controller.sv",
+        "dir::../../HDL_Vect/axi_readback.sv",
+        "dir::../../HDL_Vect/top.sv"
+    ],
+
+    "PDK": "sky130A",
+    "STD_CELL_LIBRARY": "sky130_fd_sc_hd",
+
+    "CLOCK_PORT": "clk",
+    "CLOCK_PERIOD": 50.0,
+
+    "FP_SIZING": "absolute",
+    "DIE_AREA": "0 0 6000 6000",
+    "FP_CORE_UTIL": 30,
+    "FP_ASPECT_RATIO": 1,
+
+    "PL_TARGET_DENSITY_PCT": 30,
+
+    "SYNTH_STRATEGY": "AREA 0",
+
+    "GRT_ADJUSTMENT": 0.1,
+    "GRT_ALLOW_CONGESTION": true,
+
+    "QUIT_ON_LINTER_ERRORS": false,
+    "RUN_POST_GPL_DESIGN_REPAIR": false,
+
+    "PNR_SDC_FILE":     "dir::constraints.sdc",
+    "SIGNOFF_SDC_FILE": "dir::constraints.sdc"
+}

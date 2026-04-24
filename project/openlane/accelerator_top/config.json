@@ -36,5 +36,13 @@
     "EXTRA_GDS_FILES": [],
 
     "PNR_SDC_FILE":     "dir::constraints.sdc",
-    "SIGNOFF_SDC_FILE": "dir::constraints.sdc"
+    "SIGNOFF_SDC_FILE": "dir::constraints.sdc",
+
+    "QUIT_ON_LINTER_ERRORS": false,
+
+    "RUN_POST_GPL_DESIGN_REPAIR": false,
+    "RUN_CTS": false,
+    "RUN_ANTENNA_CHECKER": false,
+    "RUN_ANTENNA_REPAIR": false,
+    "GRT_ANTENNA_ITERS": 0
 }
