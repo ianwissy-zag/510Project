@@ -60,11 +60,7 @@ read_hdl -sv               ../../HDL_Vect/top.sv
 elaborate vec_mac_top
 check_design -unresolved
 
-# Preserve bf16_mac_unit hierarchy — Genus-native equivalent of keep_hierarchy.
-# Prevents the 128 MAC instances from being flattened into the parent,
-# enabling hierarchical synthesis and dramatically reducing runtime.
-set_db [get_modules bf16_mac_unit]      .preserve true
-set_db [get_modules bf16_mac_unit_core] .preserve true
+# Hierarchy is preserved globally via auto_ungroup none above.
 
 # ── Timing constraints ────────────────────────────────────────────────────────
 # 5ns / 200MHz target — conservative for ASAP7 FP32 MAC depth.
