@@ -11,14 +11,16 @@
 # =============================================================================
 
 set script_dir    [file dirname [file normalize [info script]]]
-set asap7_lef_dir [file normalize $script_dir/../asap7/asap7sc7p5t_28/LEF]
+set asap7_root    [file normalize $script_dir/../asap7/asap7sc7p5t_28]
+set asap7_lef_dir $asap7_root/LEF
+set asap7_tef_dir $asap7_root/techlef_misc
 
 # ── Read design ───────────────────────────────────────────────────────────────
 # source mmmc.tcl directly — read_mmmc not available in this Innovus version
 source mmmc.tcl
 
 read_physical -lef [list \
-    $asap7_lef_dir/asap7_tech_1x_201209.lef \
+    $asap7_tef_dir/asap7_tech_1x_201209.lef \
     $asap7_lef_dir/asap7sc7p5t_28_R_1x_220121a.lef \
 ]
 
