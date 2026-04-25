@@ -20,9 +20,14 @@ cadence/asap7/
 Source/llm/**/*.bin
 Source/llm/*.bin
 
-# LLM accel — ignore compiled binaries
+# LLM accel — ignore compiled binaries and weight dumps
 Source/llm_accel/train_gpt2
 Source/llm_accel/test_gpt2
+Source/llm_accel/weights_accel.bin
+
+# LLM — ignore compiled binaries and weight dumps
+Source/llm/train_gpt2
+Source/llm/weights_cpu.bin
 
 # Cadence tool outputs — netlists are large and reproducible
 cadence/*/outputs/
