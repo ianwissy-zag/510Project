@@ -24,9 +24,7 @@ read_physical -lef [list \
 
 read_netlist outputs/vec_mac_top_netlist.v -top vec_mac_top
 
-init_design
-
-# Must be called after init_design in this Innovus version
+# init_design is implicit in this Innovus version after read_netlist
 set_analysis_view -setup [list av_setup] -hold [list av_hold]
 
 # ── Floorplan ─────────────────────────────────────────────────────────────────
