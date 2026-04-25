@@ -1,0 +1,90 @@
+[04/25 16:34:51      0s] 
+[04/25 16:34:51      0s] Cadence Innovus(TM) Implementation System.
+[04/25 16:34:51      0s] Copyright 2024 Cadence Design Systems, Inc. All rights reserved worldwide.
+[04/25 16:34:51      0s] 
+[04/25 16:34:51      0s] Version:	v23.10-p003_1, built Thu Feb 1 13:54:57 PST 2024
+[04/25 16:34:51      0s] Options:	-files innovus.tcl 
+[04/25 16:34:51      0s] Date:		Sat Apr 25 16:34:51 2026
+[04/25 16:34:51      0s] Host:		auto.ece.pdx.edu (x86_64 w/Linux 3.10.0-1160.119.1.el7.x86_64) (1core*32cpus*Intel Xeon Processor (Cascadelake) 16384KB)
+[04/25 16:34:51      0s] OS:		CentOS Linux 7 (Core)
+[04/25 16:34:51      0s] 
+[04/25 16:34:51      0s] License:
+[04/25 16:34:51      0s] 		[16:34:51.427937] Configured Lic search path (23.02-s003): 5280@cadence-lic.cecs.pdx.edu
+
+[04/25 16:34:51      0s] 		invs	Innovus Implementation System	23.1	checkout succeeded
+[04/25 16:34:51      0s] 		8 CPU jobs allowed with the current license(s). Use setMultiCpuUsage to set your required CPU count.
+[04/25 16:34:51      0s] **WARN: (IMPSYT-1507):	The display is invalid and will start in no window mode
+[04/25 16:34:53      1s] {{{ isCertus 0,  isCertusOrDistOptClient = 0, isInnovusCertusClient = 0}}}
+[04/25 16:35:08     14s] Reset Parastics called with the command setExtractRCMode -reset@(#)CDS: Innovus v23.10-p003_1 (64bit) 02/01/2024 13:54 (Linux 3.10.0-693.el7.x86_64)
+[04/25 16:35:11     16s] @(#)CDS: NanoRoute 23.10-p003_1 NR240109-1512/23_10-UB (database version 18.20.618) {superthreading v2.20}
+[04/25 16:35:11     16s] @(#)CDS: AAE 23.10-p002 (64bit) 02/01/2024 (Linux 3.10.0-693.el7.x86_64)
+[04/25 16:35:11     16s] @(#)CDS: CTE 23.10-p003_1 () Dec  5 2023 19:42:23 ( )
+[04/25 16:35:11     16s] @(#)CDS: SYNTECH 23.10-p002_1 () Nov 29 2023 02:17:21 ( )
+[04/25 16:35:11     16s] @(#)CDS: CPE v23.10-p004
+[04/25 16:35:11     16s] @(#)CDS: IQuantus/TQuantus 22.1.1-s215 (64bit) Mon Nov 20 10:05:08 PST 2023 (Linux 3.10.0-693.el7.x86_64)
+[04/25 16:35:11     16s] @(#)CDS: OA 22.61-p007 Wed Sep 27 19:40:10 2023
+[04/25 16:35:11     16s] @(#)CDS: SGN 23.10-d005 (03-Oct-2023) (64 bit executable, TkQt5.15.9)
+[04/25 16:35:11     16s] @(#)CDS: RCDB 11.15.0
+[04/25 16:35:11     16s] @(#)CDS: STYLUS 23.10-a001_1 (12/04/2023 04:39 PST)
+[04/25 16:35:11     16s] @(#)CDS: IntegrityPlanner-23.10-12651 (23.10) (2023-09-06 08:32:42+0800)
+[04/25 16:35:11     16s] @(#)CDS: SYNTHESIS_ENGINE 23.10-b027
+[04/25 16:35:11     16s] Create and set the environment variable TMPDIR to /home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/vec_mac_top/innovus_temp_11568_auto.ece.pdx.edu_iwyse_UiJaaT.
+
+[04/25 16:35:11     16s] Change the soft stacksize limit to 0.2%RAM (245 mbytes). Set global soft_stack_size_limit to change the value.
+[04/25 16:35:12     17s] 
+[04/25 16:35:12     17s] **INFO:  MMMC transition support version v31-84 
+[04/25 16:35:12     17s] 
+[04/25 16:35:12     17s] <CMD> set_global _enable_mmmc_by_default_flow      $CTE::mmmc_default
+[04/25 16:35:12     17s] <CMD> suppressMessage ENCEXT-2799
+[04/25 16:35:13     17s] <CMD> getVersion
+[04/25 16:35:13     17s] <CMD> define_proc_arguments ViaFillQor -info {This procedure extracts Viafill details from innovus db} -define_args {
+        {-window "window coordinates" "" list optional}
+        {-window_size "window size in microns" "" string optional}
+    
+    }
+[04/25 16:35:14     18s] [INFO] Loading Pegasus 23.20 fill procedures
+[04/25 16:35:14     18s] **WARN: Tk package not loaded. The Pegasus fill DRC monitor is disabled.
+[04/25 16:35:14     18s] <CMD> define_proc_arguments ProcessFills -info {This procedure processes Fill types} -define_args {
+    {-fillInfo "Design Fill data" "" list required}
+				{-csvName "File path for Fill Data csv file" "Path of CSV file" string required}
+				{-selectFill "type of fill to be selected in session" "list of BRIDGE/EXTENSION/STAMP/FLOATING" list required}
+    {-output_data "Boolean Flag to output Fill Data for further processing" "" string required}
+}
+[04/25 16:35:14     18s] <CMD> define_proc_arguments FillQor -info {This procedure extracts fill details from innovus db} -define_args {
+    {-layers "Fills Cleanup on which all layers" "list of Metal/Routing layers" list optional}
+				{-selectFill "type of fill to be selected in session" "list of BRIDGE/EXTENSION/STAMP/FLOATING" list optional}
+				{-outData "Boolean Flag to output Fill Data for further processing" "" boolean optional}
+    {-outDataFile "File path for Fill Data csv file" "Path of CSV file" string optional}
+}
+[04/25 16:35:14     18s] <CMD> define_proc_arguments ProcessFills_fast -info {This procedure processes Fill types} -define_args {
+    {-fillInfo "Design Fill data" "" list required}
+				{-csvName "File path for Fill Data csv file" "Path of CSV file" string required}
+				{-selectFill "type of fill to be selected in session" "list of BRIDGE/EXTENSION/STAMP/FLOATING" list required}
+    {-output_data "Boolean Flag to output Fill Data for further processing" "" string required}
+}
+[04/25 16:35:14     18s] <CMD> define_proc_arguments FillQor_fast -info {This procedure extracts fill details from innovus db} -define_args {
+    {-layers "Fills Cleanup on which all layers" "list of Metal/Routing layers" list optional}
+				{-selectFill "type of fill to be selected in session" "list of BRIDGE/EXTENSION/STAMP/FLOATING" list optional}
+				{-outData "Boolean Flag to output Fill Data for further processing" "" boolean optional}
+    {-outDataFile "File path for Fill Data csv file" "Path of CSV file" string optional}
+}
+[04/25 16:35:14     18s] <CMD> define_proc_arguments ProcessFills_fast_stampOnly -info {This procedure processes Fill types} -define_args {
+    {-fillInfo "Design Fill data" "" list required}
+	
+}
+[04/25 16:35:14     18s] <CMD> define_proc_arguments FillQor_fast_stampOnly -info {This procedure extracts fill details from innovus db} -define_args {
+    {-layers "Fills Cleanup on which all layers" "list of Metal/Routing layers" list optional}
+}
+[04/25 16:35:14     18s] Sourcing file "innovus.tcl" ...
+[04/25 16:35:14     18s] **ERROR: (IMPSYT-6692):	Invalid return code while executing 'innovus.tcl' was returned and script processing was stopped. Review the following error in 'innovus.tcl' then restart.
+[04/25 16:35:14     18s] **ERROR: (IMPSYT-6693):	Error message: innovus.tcl: invalid command name "read_mmmc".
+[04/25 16:37:13     18s] 
+[04/25 16:37:13     18s] *** Memory Usage v#2 (Current mem = 1579.207M, initial mem = 812.664M) ***
+[04/25 16:37:13     18s] 
+[04/25 16:37:13     18s] *** Summary of all messages that are not suppressed in this session:
+[04/25 16:37:13     18s] Severity  ID               Count  Summary                                  
+[04/25 16:37:13     18s] ERROR     IMPSYT-6692          1  Invalid return code while executing '%s'...
+[04/25 16:37:13     18s] ERROR     IMPSYT-6693          1  Error message: %s: %s.                   
+[04/25 16:37:13     18s] *** Message Summary: 0 warning(s), 2 error(s)
+[04/25 16:37:13     18s] 
+[04/25 16:37:13     18s] --- Ending "Innovus" (totcpu=0:00:19.8, real=0:02:22, mem=1579.2M) ---
