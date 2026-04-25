@@ -19,6 +19,11 @@ cadence/asap7/
 # Large source files not suitable for git
 Source/llm.c
 
-# Cadence tool outputs
+# Cadence tool outputs — netlists are large and reproducible
 cadence/*/outputs/
-cadence/*/reports/
+# reports are small and worth keeping
+# cadence/*/reports/
+
+# Genus log rotation files and temp directories
+cadence/**/*.log[0-9]
+cadence/**/.pbs_auto*/
