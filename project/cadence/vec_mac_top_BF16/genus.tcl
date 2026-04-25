@@ -1,6 +1,10 @@
 # =============================================================================
-# genus.tcl — Cadence Genus 2024 synthesis script for vec_mac_top
+# genus.tcl — Cadence Genus 2024 synthesis script for vec_mac_top (BF16 custom)
 # Target PDK: ASAP7 predictive 7nm (RVT standard cells)
+#
+# This variant uses the custom BF16×BF16 multiplier (bf16_mul.sv) and FP32
+# adder (bf16_fp32_add.sv) instead of the HardFloat core.  Source files are
+# from HDL_Vect_BF16/.  The HardFloat bf16_mac_unit_core.v is not used here.
 #
 # Usage:
 #   genus -f genus.tcl |& tee genus.log
@@ -26,7 +30,7 @@ set lib_tt_oa     $asap7_lib_dir/asap7sc7p5t_OA_RVT_TT_nldm_211120.lib
 
 # ── Genus global settings ─────────────────────────────────────────────────────
 set_db init_lib_search_path     $asap7_lib_dir
-set_db init_hdl_search_path     ../../HDL_Vect
+set_db init_hdl_search_path     ../../HDL_Vect_BF16
 
 # Medium effort balances runtime vs quality for a first-pass run.
 # Increase to high once the flow is validated.
@@ -43,18 +47,19 @@ set_db auto_ungroup         none
 read_libs [list $lib_tt_simple $lib_tt_invbuf $lib_tt_seq $lib_tt_ao $lib_tt_oa]
 
 # ── Read RTL ──────────────────────────────────────────────────────────────────
-# bf16_mac_unit_core.v is Verilog 2001 (Chisel/HardFloat generated).
-# All other sources are SystemVerilog 2012.
-read_hdl                   ../../HDL_Vect/bf16_mac_unit_core.v
-read_hdl -sv               ../../HDL_Vect/bf16_mac_unit.sv
-read_hdl -sv               ../../HDL_Vect/vec_mac_array.sv
-read_hdl -sv               ../../HDL_Vect/weight_sram.sv
-read_hdl -sv               ../../HDL_Vect/act_sram.sv
-read_hdl -sv               ../../HDL_Vect/output_sram.sv
-read_hdl -sv               ../../HDL_Vect/axi.sv
-read_hdl -sv               ../../HDL_Vect/controller.sv
-read_hdl -sv               ../../HDL_Vect/axi_readback.sv
-read_hdl -sv               ../../HDL_Vect/top.sv
+# Custom BF16 MAC: bf16_mul.sv + bf16_fp32_add.sv replace bf16_mac_unit_core.v.
+# All sources are SystemVerilog 2012.
+read_hdl -sv               ../../HDL_Vect_BF16/bf16_mul.sv
+read_hdl -sv               ../../HDL_Vect_BF16/bf16_fp32_add.sv
+read_hdl -sv               ../../HDL_Vect_BF16/bf16_mac_unit.sv
+read_hdl -sv               ../../HDL_Vect_BF16/vec_mac_array.sv
+read_hdl -sv               ../../HDL_Vect_BF16/weight_sram.sv
+read_hdl -sv               ../../HDL_Vect_BF16/act_sram.sv
+read_hdl -sv               ../../HDL_Vect_BF16/output_sram.sv
+read_hdl -sv               ../../HDL_Vect_BF16/axi.sv
+read_hdl -sv               ../../HDL_Vect_BF16/controller.sv
+read_hdl -sv               ../../HDL_Vect_BF16/axi_readback.sv
+read_hdl -sv               ../../HDL_Vect_BF16/top.sv
 
 # ── Elaborate ─────────────────────────────────────────────────────────────────
 elaborate vec_mac_top
