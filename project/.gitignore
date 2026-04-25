@@ -37,3 +37,13 @@ cadence/*/outputs/
 # Genus log rotation files and temp directories
 cadence/**/*.log[0-9]
 cadence/**/.pbs_auto*/
+
+# Genus formal verification outputs (large generated files)
+cadence/**/fv/
+
+# Profiling and performance data
+Source/llm/perf.data
+Source/llm/project_profile.txt
+Source/llm_accel/perf.data
+**/project_profile.txt
+**/perf.data
