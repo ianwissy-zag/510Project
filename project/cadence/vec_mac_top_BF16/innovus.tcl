@@ -55,9 +55,8 @@ place_design
 optDesign -preCTS -outDir reports/preCTS
 
 # ── Clock tree synthesis ───────────────────────────────────────────────────────
-# Targets the 5ns (200MHz) clock defined in constraints.sdc.
-# After CTS review reports/postCTS/timing.rpt — if all paths have >1ns
-# positive slack consider tightening the clock in constraints.sdc.
+# Targets the 1700ps (~588MHz) clock defined in constraints_pnr.sdc.
+# After CTS review reports/postCTS/timing.rpt for slack details.
 ccopt_design
 optDesign -postCTS       -outDir reports/postCTS
 optDesign -postCTS -hold -outDir reports/postCTS_hold

@@ -16,8 +16,13 @@ runs/
 # ASAP7 PDK — third-party repo, clone separately via git submodule
 cadence/asap7/
 
-# Large source files not suitable for git
-Source/llm.c
+# LLM source — ignore binary model/data files but track all source code
+Source/llm/**/*.bin
+Source/llm/*.bin
+
+# LLM accel — ignore compiled binaries
+Source/llm_accel/train_gpt2
+Source/llm_accel/test_gpt2
 
 # Cadence tool outputs — netlists are large and reproducible
 cadence/*/outputs/

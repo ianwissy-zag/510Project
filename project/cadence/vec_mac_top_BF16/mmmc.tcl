@@ -43,7 +43,7 @@ create_delay_corner -name dc_ff -library_set libs_ff -rc_corner rc_ff
 
 # ── Constraint mode ───────────────────────────────────────────────────────────
 create_constraint_mode -name cm_func \
-    -sdc_files [list constraints.sdc]
+    -sdc_files [list constraints_pnr.sdc]
 
 # ── Analysis views ────────────────────────────────────────────────────────────
 create_analysis_view -name av_setup -constraint_mode cm_func -delay_corner dc_ss
