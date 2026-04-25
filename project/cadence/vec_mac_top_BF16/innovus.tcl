@@ -16,7 +16,9 @@ set asap7_lef_dir $asap7_root/LEF
 set asap7_tef_dir $asap7_root/techlef_misc
 
 # ── Read design ───────────────────────────────────────────────────────────────
-# source mmmc.tcl directly — read_mmmc not available in this Innovus version
+# Set lib dir explicitly so mmmc.tcl doesn't need to re-derive it via
+# [info script], which may resolve incorrectly when sourced inside Innovus.
+set asap7_lib_dir $asap7_root/LIB/NLDM
 source mmmc.tcl
 
 read_physical -lef [list \

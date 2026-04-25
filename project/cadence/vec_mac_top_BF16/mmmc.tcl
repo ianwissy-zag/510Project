@@ -8,8 +8,12 @@
 #   Nominal:            TT  25C   0.70V
 # =============================================================================
 
-set script_dir    [file dirname [file normalize [info script]]]
-set asap7_lib_dir [file normalize $script_dir/../asap7/asap7sc7p5t_28/LIB/NLDM]
+# asap7_lib_dir may be pre-set by the calling script (innovus.tcl).
+# If not already defined, derive it from this file's location.
+if {![info exists asap7_lib_dir]} {
+    set script_dir    [file dirname [file normalize [info script]]]
+    set asap7_lib_dir [file normalize $script_dir/../asap7/asap7sc7p5t_28/LIB/NLDM]
+}
 
 # ── Library sets ──────────────────────────────────────────────────────────────
 create_library_set -name libs_tt \
