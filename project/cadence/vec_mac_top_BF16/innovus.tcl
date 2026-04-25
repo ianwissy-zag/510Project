@@ -15,20 +15,34 @@ set asap7_lef_dir $asap7_root/LEF
 set asap7_tef_dir $asap7_root/techlef_misc
 set asap7_lib_dir $asap7_root/LIB/NLDM
 
-# ── Initialise design via set_db — passes MMMC, LEF, and netlist to
-#    init_design in a single call, which is the reliable path for this
-#    Innovus version (sourcing mmmc.tcl before init_design loses timing info).
-set_db init_mmmc_files          [list [file normalize $script_dir/mmmc.tcl]]
-set_db init_lef_file            [list \
+# ── Initialise design — legacy EDI-style global variables (no MMMC in this
+#    Innovus version; read_mmmc and set_db init_mmmc_files both unavailable).
+set init_verilog    [list [file normalize outputs/vec_mac_top_netlist.v]]
+set init_top_cell   vec_mac_top
+set init_lef_file   [list \
     $asap7_tef_dir/asap7_tech_1x_201209.lef \
     $asap7_lef_dir/asap7sc7p5t_28_R_1x_220121a.lef]
-set_db init_verilog             [list [file normalize outputs/vec_mac_top_netlist.v]]
-set_db init_top_cell            vec_mac_top
-set_db init_lib_search_path     $asap7_lib_dir
+
+# Setup corner: slow-slow (worst for setup)
+set init_lib        [list \
+    $asap7_lib_dir/asap7sc7p5t_SIMPLE_RVT_SS_nldm_211120.lib \
+    $asap7_lib_dir/asap7sc7p5t_INVBUF_RVT_TT_nldm_220122.lib \
+    $asap7_lib_dir/asap7sc7p5t_SEQ_RVT_SS_nldm_220123.lib \
+    $asap7_lib_dir/asap7sc7p5t_AO_RVT_SS_nldm_211120.lib \
+    $asap7_lib_dir/asap7sc7p5t_OA_RVT_SS_nldm_211120.lib]
+
+# Min (hold) corner: fast-fast
+set init_min_lib    [list \
+    $asap7_lib_dir/asap7sc7p5t_SIMPLE_RVT_FF_nldm_211120.lib \
+    $asap7_lib_dir/asap7sc7p5t_INVBUF_RVT_TT_nldm_220122.lib \
+    $asap7_lib_dir/asap7sc7p5t_SEQ_RVT_FF_nldm_220123.lib \
+    $asap7_lib_dir/asap7sc7p5t_AO_RVT_FF_nldm_211120.lib \
+    $asap7_lib_dir/asap7sc7p5t_OA_RVT_FF_nldm_211120.lib]
+
+set init_max_lib    $init_lib
+set init_sdcfile    [list [file normalize $script_dir/constraints_pnr.sdc]]
 
 init_design
-
-set_analysis_view -setup [list av_setup] -hold [list av_hold]
 
 # ── Floorplan ─────────────────────────────────────────────────────────────────
 # 775K cells at ASAP7 density — 1000x1000 um at 45% utilisation.
