@@ -26,6 +26,9 @@ read_netlist outputs/vec_mac_top_netlist.v -top vec_mac_top
 
 init_design
 
+# Must be called after init_design in this Innovus version
+set_analysis_view -setup [list av_setup] -hold [list av_hold]
+
 # ── Floorplan ─────────────────────────────────────────────────────────────────
 # At ASAP7 7nm density the synthesized logic (~1-2M cells) fits in roughly
 # 0.5-1 mm².  1000x1000 um at 45% utilization gives comfortable headroom.
