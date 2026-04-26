@@ -49,7 +49,7 @@ place_design
 
 # Save checkpoint after placement so CTS/routing can resume without re-placing
 file mkdir outputs
-save_design outputs/vec_mac_top_placed.enc
+saveDesign outputs/vec_mac_top_placed.enc
 
 # ── Clock tree synthesis ───────────────────────────────────────────────────────
 # With delay corners registered above, ccopt_design should now proceed.
@@ -67,6 +67,6 @@ report_congestion                                > reports/congestion_final.rpt
 
 # ── Write outputs ─────────────────────────────────────────────────────────────
 file mkdir outputs
-write_netlist  outputs/vec_mac_top_final.v
-write_sdf      outputs/vec_mac_top.sdf
-save_design    outputs/vec_mac_top_final.enc
+saveNetlist    outputs/vec_mac_top_final.v
+writeSDF       outputs/vec_mac_top.sdf
+saveDesign     outputs/vec_mac_top_final.enc
