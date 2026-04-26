@@ -46,8 +46,12 @@ create_delay_corner -name dc_ss -library_set libs_ss -rc_corner rc_ss
 create_delay_corner -name dc_ff -library_set libs_ff -rc_corner rc_ff
 
 # ── Constraint mode ───────────────────────────────────────────────────────────
+# Derive absolute SDC path — relative paths fail when Innovus CWD != script dir
+if {![info exists script_dir]} {
+    set script_dir [file dirname [file normalize [info script]]]
+}
 create_constraint_mode -name cm_func \
-    -sdc_files [list constraints_pnr.sdc]
+    -sdc_files [list [file normalize $script_dir/constraints_pnr.sdc]]
 
 # ── Analysis views ────────────────────────────────────────────────────────────
 create_analysis_view -name av_setup -constraint_mode cm_func -delay_corner dc_ss

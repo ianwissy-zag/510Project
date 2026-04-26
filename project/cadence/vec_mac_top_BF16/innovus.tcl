@@ -66,6 +66,10 @@ sroute -nets {VDD VSS}
 
 # ── Placement ─────────────────────────────────────────────────────────────────
 place_design
+
+# Disable Genus co-optimization worker — crashes via SEGV in tomGetCteView
+# when timing views are not fully initialized. Use Innovus optimizer only.
+setOptMode -usefulSkew false
 optDesign -preCTS -outDir reports/preCTS
 
 # ── Clock tree synthesis ───────────────────────────────────────────────────────
