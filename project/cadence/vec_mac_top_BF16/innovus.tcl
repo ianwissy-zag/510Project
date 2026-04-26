@@ -43,6 +43,21 @@ set init_sdcfile    [list [file normalize $script_dir/constraints_pnr.sdc]]
 
 init_design
 
+# ── Timing setup post-init ────────────────────────────────────────────────────
+# The legacy init_* variables load cells but don't register MMMC corner objects
+# needed by CTS and routing.  Register them explicitly here after init_design.
+create_library_set -name libs_ss -timing $init_lib
+create_library_set -name libs_ff -timing $init_min_lib
+create_rc_corner   -name rc_ss -preRoute_res 1.2 -preRoute_cap 1.1
+create_rc_corner   -name rc_ff -preRoute_res 0.9 -preRoute_cap 0.9
+create_delay_corner -name dc_ss -library_set libs_ss -rc_corner rc_ss
+create_delay_corner -name dc_ff -library_set libs_ff -rc_corner rc_ff
+create_constraint_mode -name cm_func \
+    -sdc_files [list [file normalize $script_dir/constraints_pnr.sdc]]
+create_analysis_view -name av_setup -constraint_mode cm_func -delay_corner dc_ss
+create_analysis_view -name av_hold  -constraint_mode cm_func -delay_corner dc_ff
+set_analysis_view -setup av_setup -hold av_hold
+
 # ── Floorplan ─────────────────────────────────────────────────────────────────
 floorPlan -r 1.0 0.45 2.0 2.0 2.0 2.0
 
@@ -64,10 +79,7 @@ sroute -nets {VDD VSS}
 place_design
 
 # ── Clock tree synthesis ───────────────────────────────────────────────────────
-# optDesign is skipped entirely — it crashes unconditionally in
-# coeIslandRestructWorkers::initialSanityCheck via tomGetCteView(tosAnalysisView*)
-# when the CTE/timing view isn't fully initialised.  Removing these calls
-# skips timing optimisation but allows the flow to reach routing and signoff.
+# With delay corners registered above, ccopt_design should now proceed.
 ccopt_design
 
 # ── Routing ───────────────────────────────────────────────────────────────────
