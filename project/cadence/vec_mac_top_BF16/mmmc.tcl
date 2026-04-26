@@ -17,13 +17,28 @@ if {![info exists asap7_lib_dir]} {
 
 # ── Library sets ──────────────────────────────────────────────────────────────
 create_library_set -name libs_tt \
-    -timing [list $asap7_lib_dir/asap7sc7p5t_SIMPLE_RVT_TT_nldm_211120.lib]
+    -timing [list \
+        $asap7_lib_dir/asap7sc7p5t_SIMPLE_RVT_TT_nldm_211120.lib \
+        $asap7_lib_dir/asap7sc7p5t_INVBUF_RVT_TT_nldm_220122.lib \
+        $asap7_lib_dir/asap7sc7p5t_SEQ_RVT_TT_nldm_220123.lib \
+        $asap7_lib_dir/asap7sc7p5t_AO_RVT_TT_nldm_211120.lib \
+        $asap7_lib_dir/asap7sc7p5t_OA_RVT_TT_nldm_211120.lib]
 
 create_library_set -name libs_ss \
-    -timing [list $asap7_lib_dir/asap7sc7p5t_SIMPLE_RVT_SS_nldm_211120.lib]
+    -timing [list \
+        $asap7_lib_dir/asap7sc7p5t_SIMPLE_RVT_SS_nldm_211120.lib \
+        $asap7_lib_dir/asap7sc7p5t_INVBUF_RVT_SS_nldm_220122.lib \
+        $asap7_lib_dir/asap7sc7p5t_SEQ_RVT_SS_nldm_220123.lib \
+        $asap7_lib_dir/asap7sc7p5t_AO_RVT_SS_nldm_211120.lib \
+        $asap7_lib_dir/asap7sc7p5t_OA_RVT_SS_nldm_211120.lib]
 
 create_library_set -name libs_ff \
-    -timing [list $asap7_lib_dir/asap7sc7p5t_SIMPLE_RVT_FF_nldm_211120.lib]
+    -timing [list \
+        $asap7_lib_dir/asap7sc7p5t_SIMPLE_RVT_FF_nldm_211120.lib \
+        $asap7_lib_dir/asap7sc7p5t_INVBUF_RVT_FF_nldm_220122.lib \
+        $asap7_lib_dir/asap7sc7p5t_SEQ_RVT_FF_nldm_220123.lib \
+        $asap7_lib_dir/asap7sc7p5t_AO_RVT_FF_nldm_211120.lib \
+        $asap7_lib_dir/asap7sc7p5t_OA_RVT_FF_nldm_211120.lib]
 
 # ── RC corners ────────────────────────────────────────────────────────────────
 # ASAP7 wire RC values from the PDK documentation.
