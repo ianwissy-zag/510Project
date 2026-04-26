@@ -1,0 +1,53 @@
+rm -f results.xml
+"make" -f Makefile results.xml
+make[1]: Entering directory '/home/ian-wyse/Documents/ECE510/Project/codefest/cf04/cocotb_mac'
+rm -f results.xml
+COCOTB_TEST_MODULES=test_mac COCOTB_TESTCASE= COCOTB_TEST_FILTER= COCOTB_TOPLEVEL=mac TOPLEVEL_LANG=verilog \
+         /usr/bin/vvp -M /home/ian-wyse/Enviroments/myenv/lib/python3.12/site-packages/cocotb/libs -m libcocotbvpi_icarus   sim_build/sim.vvp -fst  
+     -.--ns INFO     gpi                                ..mbed/gpi_embed.cpp:93   in _embed_init_python              Using Python 3.12.4 interpreter at /home/ian-wyse/Enviroments/myenv/bin/python3
+     -.--ns INFO     gpi                                ../gpi/GpiCommon.cpp:79   in gpi_print_registered_impl       VPI registered
+     0.00ns INFO     cocotb                             Running on Icarus Verilog version 12.0 (stable)
+     0.00ns INFO     cocotb                             Seeding Python random module with 1777163016
+     0.00ns INFO     cocotb                             Initialized cocotb v2.0.1 from /home/ian-wyse/Enviroments/myenv/lib/python3.12/site-packages/cocotb
+     0.00ns INFO     cocotb.regression                  pytest not found, install it to enable better AssertionError messages
+     0.00ns INFO     cocotb                             Running tests
+     0.00ns INFO     cocotb.regression                  running test_mac.test_mac_basic (1/8)
+                                                            Basic accumulation: a=3, b=4 → 12, 24, 36 then reset to 0.
+    40.00ns INFO     cocotb.regression                  test_mac.test_mac_basic passed
+    40.00ns INFO     cocotb.regression                  running test_mac.test_mac_signed_negative (2/8)
+                                                            Signed multiplication: a=-3, b=4 → -12, -24, -36.
+    80.00ns INFO     cocotb.regression                  test_mac.test_mac_signed_negative passed
+    80.00ns INFO     cocotb.regression                  running test_mac.test_mac_signed_both_negative (3/8)
+                                                            Both inputs negative: a=-2, b=-3 → +6, +12, +18.
+   120.00ns INFO     cocotb.regression                  test_mac.test_mac_signed_both_negative passed
+   120.00ns INFO     cocotb.regression                  running test_mac.test_mac_zero_input (4/8)
+                                                            Zero input: accumulator should not change.
+   170.01ns INFO     cocotb.regression                  test_mac.test_mac_zero_input passed
+   170.01ns INFO     cocotb.regression                  running test_mac.test_mac_max_positive (5/8)
+                                                            Boundary: a=127, b=127 (max signed 8-bit) → 16129 per cycle.
+   230.01ns INFO     cocotb.regression                  test_mac.test_mac_max_positive passed
+   230.01ns INFO     cocotb.regression                  running test_mac.test_mac_reset_mid_stream (6/8)
+                                                            Reset mid-stream clears accumulator immediately on next posedge.
+   280.01ns INFO     cocotb.regression                  test_mac.test_mac_reset_mid_stream passed
+   280.01ns INFO     cocotb.regression                  running test_mac.test_mac_overflow_positive (7/8)
+                                                            Positive overflow: accumulator wraps from max to min signed.
+   310.01ns INFO     cocotb.regression                  test_mac.test_mac_overflow_positive passed
+   310.01ns INFO     cocotb.regression                  running test_mac.test_mac_overflow_negative (8/8)
+                                                            Negative overflow (underflow): accumulator wraps from min to max signed.
+   340.01ns INFO     cocotb.regression                  test_mac.test_mac_overflow_negative passed
+   340.01ns INFO     cocotb.regression                  ************************************************************************************************
+                                                        ** TEST                                    STATUS  SIM TIME (ns)  REAL TIME (s)  RATIO (ns/s) **
+                                                        ************************************************************************************************
+                                                        ** test_mac.test_mac_basic                  PASS          40.00           0.00      23416.10  **
+                                                        ** test_mac.test_mac_signed_negative        PASS          40.00           0.00      68257.26  **
+                                                        ** test_mac.test_mac_signed_both_negative   PASS          40.00           0.00      72192.92  **
+                                                        ** test_mac.test_mac_zero_input             PASS          50.00           0.00      77017.77  **
+                                                        ** test_mac.test_mac_max_positive           PASS          60.00           0.00      83831.59  **
+                                                        ** test_mac.test_mac_reset_mid_stream       PASS          50.00           0.00      73870.87  **
+                                                        ** test_mac.test_mac_overflow_positive      PASS          30.00           0.00      61113.80  **
+                                                        ** test_mac.test_mac_overflow_negative      PASS          30.00           0.00      60730.36  **
+                                                        ************************************************************************************************
+                                                        ** TESTS=8 PASS=8 FAIL=0 SKIP=0                          340.01           0.01      33463.79  **
+                                                        ************************************************************************************************
+FST info: dumpfile sim_build/mac.fst opened for output.
+make[1]: Leaving directory '/home/ian-wyse/Documents/ECE510/Project/codefest/cf04/cocotb_mac'

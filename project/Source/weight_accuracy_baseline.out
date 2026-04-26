@@ -1,0 +1,20 @@
+Parameters : 124,475,904  (497.9 MB per file)
+Computing statistics in chunks...
+
+Absolute difference:
+  mean   : 1.938844e-06
+  median : 2.235174e-08  (estimated from first 200K params)
+  max    : 2.000332e-04
+  std    : 1.771348e-05
+
+Relative difference (|cpu| > 1e-6, 124,438,777 params):
+  mean   : 0.0175%
+
+Cosine similarity : 0.99999999  (1.0 = identical)
+
+Fraction of params within threshold:
+  |diff| <= 1e-06 : 91.79%  (114,258,529 / 124,475,904)
+  |diff| <= 1e-05 : 98.73%  (122,891,280 / 124,475,904)
+  |diff| <= 1e-04 : 99.18%  (123,457,786 / 124,475,904)
+  |diff| <= 1e-03 : 100.00%  (124,475,904 / 124,475,904)
+  |diff| <= 1e-02 : 100.00%  (124,475,904 / 124,475,904)

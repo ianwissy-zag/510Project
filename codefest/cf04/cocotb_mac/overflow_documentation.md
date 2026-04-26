@@ -1,0 +1,1 @@
+The module wraps on overflow, both negative and positive. This is the default behavior of Verilog variables. Since the values were signed the positive overflow wrapped from 2,147,483,647 to -2,147,483,647 (0x7FFFFFFF to 0x80000000) and the negative overflow wrapped from 2,147,483,647 to -2,147,483,647 (0x80000000 to 0x7FFFFFFF). The increment/decrement value in each test was 1. 

@@ -1,0 +1,13 @@
+<testsuites name="results">
+  <testsuite name="all" package="all">
+    <property name="random_seed" value="1777163016" />
+    <testcase name="test_mac_basic" classname="test_mac" file="/home/ian-wyse/Documents/ECE510/Project/codefest/cf04/cocotb_mac/test_mac.py" lineno="19" time="0.0017082691192626953" sim_time_ns="40.001" ratio_time="23416.099693510118" />
+    <testcase name="test_mac_signed_negative" classname="test_mac" file="/home/ian-wyse/Documents/ECE510/Project/codefest/cf04/cocotb_mac/test_mac.py" lineno="42" time="0.0005860328674316406" sim_time_ns="40.001" ratio_time="68257.26375264442" />
+    <testcase name="test_mac_signed_both_negative" classname="test_mac" file="/home/ian-wyse/Documents/ECE510/Project/codefest/cf04/cocotb_mac/test_mac.py" lineno="57" time="0.0005540847778320312" sim_time_ns="40.00099999999999" ratio_time="72192.92353872632" />
+    <testcase name="test_mac_zero_input" classname="test_mac" file="/home/ian-wyse/Documents/ECE510/Project/codefest/cf04/cocotb_mac/test_mac.py" lineno="72" time="0.0006492137908935547" sim_time_ns="50.001000000000005" ratio_time="77017.77242159384" />
+    <testcase name="test_mac_max_positive" classname="test_mac" file="/home/ian-wyse/Documents/ECE510/Project/codefest/cf04/cocotb_mac/test_mac.py" lineno="90" time="0.0007157325744628906" sim_time_ns="60.000999999999976" ratio_time="83831.59037441702" />
+    <testcase name="test_mac_reset_mid_stream" classname="test_mac" file="/home/ian-wyse/Documents/ECE510/Project/codefest/cf04/cocotb_mac/test_mac.py" lineno="108" time="0.0006768703460693359" sim_time_ns="50.00100000000003" ratio_time="73870.86801831635" />
+    <testcase name="test_mac_overflow_positive" classname="test_mac" file="/home/ian-wyse/Documents/ECE510/Project/codefest/cf04/cocotb_mac/test_mac.py" lineno="132" time="0.0004909038543701172" sim_time_ns="30.000999999999976" ratio_time="61113.80005050991" />
+    <testcase name="test_mac_overflow_negative" classname="test_mac" file="/home/ian-wyse/Documents/ECE510/Project/codefest/cf04/cocotb_mac/test_mac.py" lineno="157" time="0.0004940032958984375" sim_time_ns="30.000999999999976" ratio_time="60730.364046332" />
+  </testsuite>
+</testsuites>
