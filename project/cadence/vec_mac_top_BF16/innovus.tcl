@@ -54,8 +54,8 @@ saveDesign outputs/vec_mac_top_placed.enc
 # ── Clock tree synthesis ───────────────────────────────────────────────────────
 # Specify buffer and inverter cells for CTS — required when the tool cannot
 # automatically identify clock cells from the library.
-setOptMode -bufFootprint  {BUFx4_ASAP7_75t_R BUFx6f_ASAP7_75t_R BUFx12f_ASAP7_75t_R}
-setOptMode -invFootprint  {INVx1_ASAP7_75t_R INVx2_ASAP7_75t_R INVx4_ASAP7_75t_R}
+set_db cts_buffer_cells   {BUFx4_ASAP7_75t_R BUFx6f_ASAP7_75t_R BUFx12f_ASAP7_75t_R}
+set_db cts_inverter_cells {INVx1_ASAP7_75t_R INVx2_ASAP7_75t_R INVx4_ASAP7_75t_R}
 ccopt_design
 
 # ── Routing ───────────────────────────────────────────────────────────────────
