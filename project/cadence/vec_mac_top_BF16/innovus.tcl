@@ -78,6 +78,10 @@ sroute -nets {VDD VSS}
 # ── Placement ─────────────────────────────────────────────────────────────────
 place_design
 
+# Save checkpoint after placement so CTS/routing can resume without re-placing
+file mkdir outputs
+save_design outputs/vec_mac_top_placed.enc
+
 # ── Clock tree synthesis ───────────────────────────────────────────────────────
 # With delay corners registered above, ccopt_design should now proceed.
 ccopt_design
