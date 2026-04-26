@@ -15,48 +15,17 @@ set asap7_lef_dir $asap7_root/LEF
 set asap7_tef_dir $asap7_root/techlef_misc
 set asap7_lib_dir $asap7_root/LIB/NLDM
 
-# ── Initialise design — legacy EDI-style global variables ─────────────────────
+# ── Initialise design ─────────────────────────────────────────────────────────
+# init_mmmc_file is the correct Innovus 21.x variable for timing setup.
+# mmmc.tcl defines library sets, delay corners, constraint modes and views.
 set init_verilog    [list [file normalize outputs/vec_mac_top_netlist.v]]
 set init_top_cell   vec_mac_top
 set init_lef_file   [list \
     $asap7_tef_dir/asap7_tech_1x_201209.lef \
     $asap7_lef_dir/asap7sc7p5t_28_R_1x_220121a.lef]
-
-# Setup corner: slow-slow
-set init_lib        [list \
-    $asap7_lib_dir/asap7sc7p5t_SIMPLE_RVT_SS_nldm_211120.lib \
-    $asap7_lib_dir/asap7sc7p5t_INVBUF_RVT_TT_nldm_220122.lib \
-    $asap7_lib_dir/asap7sc7p5t_SEQ_RVT_SS_nldm_220123.lib \
-    $asap7_lib_dir/asap7sc7p5t_AO_RVT_SS_nldm_211120.lib \
-    $asap7_lib_dir/asap7sc7p5t_OA_RVT_SS_nldm_211120.lib]
-
-# Hold corner: fast-fast
-set init_min_lib    [list \
-    $asap7_lib_dir/asap7sc7p5t_SIMPLE_RVT_FF_nldm_211120.lib \
-    $asap7_lib_dir/asap7sc7p5t_INVBUF_RVT_TT_nldm_220122.lib \
-    $asap7_lib_dir/asap7sc7p5t_SEQ_RVT_FF_nldm_220123.lib \
-    $asap7_lib_dir/asap7sc7p5t_AO_RVT_FF_nldm_211120.lib \
-    $asap7_lib_dir/asap7sc7p5t_OA_RVT_FF_nldm_211120.lib]
-
-set init_max_lib    $init_lib
-set init_sdcfile    [list [file normalize $script_dir/constraints_pnr.sdc]]
+set init_mmmc_file  [file normalize $script_dir/mmmc.tcl]
 
 init_design
-
-# ── Timing setup post-init ────────────────────────────────────────────────────
-# The legacy init_* variables load cells but don't register MMMC corner objects
-# needed by CTS and routing.  Register them explicitly here after init_design.
-create_library_set -name libs_ss -timing $init_lib
-create_library_set -name libs_ff -timing $init_min_lib
-create_rc_corner   -name rc_ss -preRoute_res 1.2 -preRoute_cap 1.1
-create_rc_corner   -name rc_ff -preRoute_res 0.9 -preRoute_cap 0.9
-create_delay_corner -name dc_ss -library_set libs_ss -rc_corner rc_ss
-create_delay_corner -name dc_ff -library_set libs_ff -rc_corner rc_ff
-create_constraint_mode -name cm_func \
-    -sdc_files [list [file normalize $script_dir/constraints_pnr.sdc]]
-create_analysis_view -name av_setup -constraint_mode cm_func -delay_corner dc_ss
-create_analysis_view -name av_hold  -constraint_mode cm_func -delay_corner dc_ff
-set_analysis_view -setup av_setup -hold av_hold
 
 # ── Floorplan ─────────────────────────────────────────────────────────────────
 floorPlan -r 1.0 0.45 2.0 2.0 2.0 2.0

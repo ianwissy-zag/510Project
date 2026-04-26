@@ -58,4 +58,4 @@ create_analysis_view -name av_setup -constraint_mode cm_func -delay_corner dc_ss
 create_analysis_view -name av_hold  -constraint_mode cm_func -delay_corner dc_ff
 create_analysis_view -name av_tt    -constraint_mode cm_func -delay_corner dc_tt
 
-# set_analysis_view called after init_design in innovus.tcl
+set_analysis_view -setup [list av_setup] -hold [list av_hold]
