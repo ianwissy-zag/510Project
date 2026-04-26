@@ -1,0 +1,11 @@
+PASS  at 10000: Output is correctly    0
+PASS  at 20000: Output is correctly   12
+PASS  at 30000: Output is correctly   24
+PASS  at 40000: Output is correctly   36
+PASS  at 50000: Output is correctly    0
+PASS  at 60000: Output is correctly  -10
+PASS  at 70000: Output is correctly  -20
+--------------------------------------------------
+SIMULATION PASSED! All outputs matched expected values.
+--------------------------------------------------
+- mac_tb.v:80: Verilog $finish
