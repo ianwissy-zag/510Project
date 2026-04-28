@@ -1,0 +1,1391 @@
+
+Cadence Innovus(TM) Implementation System.
+Copyright 2021 Cadence Design Systems, Inc. All rights reserved worldwide.
+
+Version:	v21.14-s109_1, built Wed Jun 29 09:53:08 PDT 2022
+Options:	-files resume_cts.tcl 
+Date:		Sun Apr 26 14:22:16 2026
+Host:		auto.ece.pdx.edu (x86_64 w/Linux 3.10.0-1160.119.1.el7.x86_64) (1core*32cpus*Intel Xeon Processor (Cascadelake) 16384KB)
+OS:		CentOS Linux release 7.9.2009 (Core)
+
+License:
+		[14:22:16.480129] Configured Lic search path (21.01-s002): 5280@cadence-lic.cecs.pdx.edu
+
+		invs	Innovus Implementation System	21.1	checkout succeeded
+		8 CPU jobs allowed with the current license(s). Use setMultiCpuUsage to set your required CPU count.
+**WARN: (IMPSYT-1507):	The display is invalid and will start in no window mode
+Create and set the environment variable TMPDIR to /tmp/innovus_temp_1422_auto.ece.pdx.edu_iwyse_4BMJEo.
+
+Change the soft stacksize limit to 0.2%RAM (245 mbytes). Set global soft_stack_size_limit to change the value.
+
+**INFO:  MMMC transition support version v31-84 
+
+Sourcing file "resume_cts.tcl" ...
+#% Begin load design ... (date=04/26 14:22:39, mem=733.3M)
+Set Default Input Pin Transition as 0.1 ps.
+Loading design 'vec_mac_top' saved by 'Innovus' '21.14-s109_1' on 'Sun Apr 26 13:08:23 2026'.
+% Begin Load MMMC data ... (date=04/26 14:22:40, mem=736.0M)
+% End Load MMMC data ... (date=04/26 14:22:40, total cpu=0:00:00.0, real=0:00:00.0, peak res=736.8M, current mem=736.8M)
+
+Loading LEF file /home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/vec_mac_top_BF16/outputs/vec_mac_top_placed.enc.dat/libs/lef/asap7_tech_1x_201209.lef ...
+
+Loading LEF file /home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/vec_mac_top_BF16/outputs/vec_mac_top_placed.enc.dat/libs/lef/asap7sc7p5t_28_R_1x_220121a.lef ...
+**WARN: (IMPLF-108):	There is no overlap layer defined in any LEF file
+so you are unable to create rectilinear partition in a hierarchical flow.
+Set DBUPerIGU to M1 pitch 36.
+[14:22:40.186915] Periodic Lic check successful
+[14:22:40.186930] Feature usage summary:
+[14:22:40.186931] Innovus_Impl_System
+[14:22:40.186936] Innovus_7nm_Opt
+
+This command "restoreDesign /u/iwyse/Documents/ECE510/project/510Project/project/cadence/vec_mac_top_BF16/outputs/vec_mac_top_placed.enc.dat ..." required an extra checkout of license invs_7nm.
+Additional license(s) checked out: 1 'Innovus_7nm_Opt' license(s)
+
+viaInitial starts at Sun Apr 26 14:22:40 2026
+viaInitial ends at Sun Apr 26 14:22:40 2026
+
+##  Check design process and node:  
+##  Both design process and tech node are not set.
+
+Loading view definition file from /home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/vec_mac_top_BF16/outputs/vec_mac_top_placed.enc.dat/viewDefinition.tcl
+Reading libs_ss timing library '/home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/asap7/asap7sc7p5t_28/LIB/NLDM/asap7sc7p5t_SIMPLE_RVT_SS_nldm_211120.lib' ...
+**WARN: (TECHLIB-1277):	The attribute 'input_signal_level' has been defined for output pin 'CON'. 'input_signal_level' cannot be defined at this level and is being ignored. (File /home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/asap7/asap7sc7p5t_28/LIB/NLDM/asap7sc7p5t_SIMPLE_RVT_SS_nldm_211120.lib, Line 11365)
+**WARN: (TECHLIB-1277):	The attribute 'input_signal_level' has been defined for output pin 'CON'. 'input_signal_level' cannot be defined at this level and is being ignored. (File /home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/asap7/asap7sc7p5t_28/LIB/NLDM/asap7sc7p5t_SIMPLE_RVT_SS_nldm_211120.lib, Line 14263)
+Read 56 cells in library 'asap7sc7p5t_SIMPLE_RVT_SS_nldm_211120' 
+Reading libs_ff timing library '/home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/asap7/asap7sc7p5t_28/LIB/NLDM/asap7sc7p5t_SIMPLE_RVT_FF_nldm_211120.lib' ...
+**WARN: (TECHLIB-1277):	The attribute 'input_signal_level' has been defined for output pin 'CON'. 'input_signal_level' cannot be defined at this level and is being ignored. (File /home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/asap7/asap7sc7p5t_28/LIB/NLDM/asap7sc7p5t_SIMPLE_RVT_FF_nldm_211120.lib, Line 11387)
+**WARN: (TECHLIB-1277):	The attribute 'input_signal_level' has been defined for output pin 'CON'. 'input_signal_level' cannot be defined at this level and is being ignored. (File /home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/asap7/asap7sc7p5t_28/LIB/NLDM/asap7sc7p5t_SIMPLE_RVT_FF_nldm_211120.lib, Line 14287)
+Read 56 cells in library 'asap7sc7p5t_SIMPLE_RVT_FF_nldm_211120' 
+*** End library_loading (cpu=0.01min, real=0.00min, mem=8.5M, fe_cpu=0.32min, fe_real=0.40min, fe_mem=857.3M) ***
+% Begin Load netlist data ... (date=04/26 14:22:40, mem=747.4M)
+*** Begin netlist parsing (mem=857.3M) ***
+Created 56 new cells from 2 timing libraries.
+Reading netlist ...
+Backslashed names will retain backslash and a trailing blank character.
+Reading verilogBinary netlist '/home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/vec_mac_top_BF16/outputs/vec_mac_top_placed.enc.dat/vec_mac_top.v.bin'
+
+*** Memory Usage v#1 (Current mem = 1056.457M, initial mem = 390.141M) ***
+*** End netlist parsing (cpu=0:00:01.7, real=0:00:02.0, mem=1056.5M) ***
+% End Load netlist data ... (date=04/26 14:22:42, total cpu=0:00:01.8, real=0:00:02.0, peak res=944.5M, current mem=941.3M)
+Set top cell to vec_mac_top.
+Hooked 112 DB cells to tlib cells.
+Starting recursive module instantiation check.
+No recursion found.
+Building hierarchical netlist for Cell vec_mac_top ...
+*** Netlist is unique.
+Set DBUPerIGU to techSite asap7sc7p5t width 54.
+** info: there are 662 modules.
+** info: there are 775391 stdCell insts.
+
+*** Memory Usage v#1 (Current mem = 1599.953M, initial mem = 390.141M) ***
+*info: set bottom ioPad orient R0
+
+Honor LEF defined pitches for advanced node
+Start create_tracks
+Loading preference file /home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/vec_mac_top_BF16/outputs/vec_mac_top_placed.enc.dat/gui.pref.tcl ...
+Change floorplan default-technical-site to 'asap7sc7p5t'.
+*Info: initialize multi-corner CTS.
+Total number of combinational cells: 56
+Total number of sequential cells: 0
+Total number of tristate cells: 0
+Total number of level shifter cells: 0
+Total number of power gating cells: 0
+Total number of isolation cells: 0
+Total number of power switch cells: 0
+Total number of pulse generator cells: 0
+Total number of always on buffers: 0
+Total number of retention cells: 0
+List of usable buffers:
+Total number of usable buffers: 0
+List of unusable buffers:
+Total number of unusable buffers: 0
+List of usable inverters:
+Total number of usable inverters: 0
+List of unusable inverters:
+Total number of unusable inverters: 0
+List of identified usable delay cells:
+Total number of identified usable delay cells: 0
+List of identified unusable delay cells:
+Total number of identified unusable delay cells: 0
+No delay cells were detected in the set of buffers. Buffers will be used to fix hold violations.
+**WARN: (IMPOPT-3000):	Buffer footprint is not defined or is an invalid buffer footprint.
+Type 'man IMPOPT-3000' for more detail.
+**WARN: (IMPOPT-3001):	Inverter footprint is not defined or is an invalid inverter footprint.
+Type 'man IMPOPT-3001' for more detail.
+**WARN: (IMPSYC-2):	Timing information is not defined for cell OAI33xp33_ASAP7_75t_R; Check the timing library (.lib) file and make sure the timing information exists for the cell and you can run the checkTimingLibrary command to verify if the timing library has complete information after the design is loaded.
+Type 'man IMPSYC-2' for more detail.
+**WARN: (IMPSYC-2):	Timing information is not defined for cell OAI331xp33_ASAP7_75t_R; Check the timing library (.lib) file and make sure the timing information exists for the cell and you can run the checkTimingLibrary command to verify if the timing library has complete information after the design is loaded.
+Type 'man IMPSYC-2' for more detail.
+**WARN: (IMPSYC-2):	Timing information is not defined for cell OAI32xp33_ASAP7_75t_R; Check the timing library (.lib) file and make sure the timing information exists for the cell and you can run the checkTimingLibrary command to verify if the timing library has complete information after the design is loaded.
+Type 'man IMPSYC-2' for more detail.
+**WARN: (IMPSYC-2):	Timing information is not defined for cell OAI322xp33_ASAP7_75t_R; Check the timing library (.lib) file and make sure the timing information exists for the cell and you can run the checkTimingLibrary command to verify if the timing library has complete information after the design is loaded.
+Type 'man IMPSYC-2' for more detail.
+**WARN: (IMPSYC-2):	Timing information is not defined for cell OAI321xp33_ASAP7_75t_R; Check the timing library (.lib) file and make sure the timing information exists for the cell and you can run the checkTimingLibrary command to verify if the timing library has complete information after the design is loaded.
+Type 'man IMPSYC-2' for more detail.
+**WARN: (IMPSYC-2):	Timing information is not defined for cell OAI31xp67_ASAP7_75t_R; Check the timing library (.lib) file and make sure the timing information exists for the cell and you can run the checkTimingLibrary command to verify if the timing library has complete information after the design is loaded.
+Type 'man IMPSYC-2' for more detail.
+**WARN: (IMPSYC-2):	Timing information is not defined for cell OAI31xp33_ASAP7_75t_R; Check the timing library (.lib) file and make sure the timing information exists for the cell and you can run the checkTimingLibrary command to verify if the timing library has complete information after the design is loaded.
+Type 'man IMPSYC-2' for more detail.
+**WARN: (IMPSYC-2):	Timing information is not defined for cell OAI311xp33_ASAP7_75t_R; Check the timing library (.lib) file and make sure the timing information exists for the cell and you can run the checkTimingLibrary command to verify if the timing library has complete information after the design is loaded.
+Type 'man IMPSYC-2' for more detail.
+**WARN: (IMPSYC-2):	Timing information is not defined for cell OAI22xp5_ASAP7_75t_R; Check the timing library (.lib) file and make sure the timing information exists for the cell and you can run the checkTimingLibrary command to verify if the timing library has complete information after the design is loaded.
+Type 'man IMPSYC-2' for more detail.
+**WARN: (IMPSYC-2):	Timing information is not defined for cell OAI22xp33_ASAP7_75t_R; Check the timing library (.lib) file and make sure the timing information exists for the cell and you can run the checkTimingLibrary command to verify if the timing library has complete information after the design is loaded.
+Type 'man IMPSYC-2' for more detail.
+**WARN: (IMPSYC-2):	Timing information is not defined for cell OAI22x1_ASAP7_75t_R; Check the timing library (.lib) file and make sure the timing information exists for the cell and you can run the checkTimingLibrary command to verify if the timing library has complete information after the design is loaded.
+Type 'man IMPSYC-2' for more detail.
+**WARN: (IMPSYC-2):	Timing information is not defined for cell OAI222xp33_ASAP7_75t_R; Check the timing library (.lib) file and make sure the timing information exists for the cell and you can run the checkTimingLibrary command to verify if the timing library has complete information after the design is loaded.
+Type 'man IMPSYC-2' for more detail.
+**WARN: (IMPSYC-2):	Timing information is not defined for cell OAI221xp5_ASAP7_75t_R; Check the timing library (.lib) file and make sure the timing information exists for the cell and you can run the checkTimingLibrary command to verify if the timing library has complete information after the design is loaded.
+Type 'man IMPSYC-2' for more detail.
+**WARN: (IMPSYC-2):	Timing information is not defined for cell OAI21xp5_ASAP7_75t_R; Check the timing library (.lib) file and make sure the timing information exists for the cell and you can run the checkTimingLibrary command to verify if the timing library has complete information after the design is loaded.
+Type 'man IMPSYC-2' for more detail.
+**WARN: (IMPSYC-2):	Timing information is not defined for cell OAI21xp33_ASAP7_75t_R; Check the timing library (.lib) file and make sure the timing information exists for the cell and you can run the checkTimingLibrary command to verify if the timing library has complete information after the design is loaded.
+Type 'man IMPSYC-2' for more detail.
+**WARN: (IMPSYC-2):	Timing information is not defined for cell OAI21x1_ASAP7_75t_R; Check the timing library (.lib) file and make sure the timing information exists for the cell and you can run the checkTimingLibrary command to verify if the timing library has complete information after the design is loaded.
+Type 'man IMPSYC-2' for more detail.
+**WARN: (IMPSYC-2):	Timing information is not defined for cell OAI211xp5_ASAP7_75t_R; Check the timing library (.lib) file and make sure the timing information exists for the cell and you can run the checkTimingLibrary command to verify if the timing library has complete information after the design is loaded.
+Type 'man IMPSYC-2' for more detail.
+**WARN: (IMPSYC-2):	Timing information is not defined for cell OA33x2_ASAP7_75t_R; Check the timing library (.lib) file and make sure the timing information exists for the cell and you can run the checkTimingLibrary command to verify if the timing library has complete information after the design is loaded.
+Type 'man IMPSYC-2' for more detail.
+**WARN: (IMPSYC-2):	Timing information is not defined for cell OA22x2_ASAP7_75t_R; Check the timing library (.lib) file and make sure the timing information exists for the cell and you can run the checkTimingLibrary command to verify if the timing library has complete information after the design is loaded.
+Type 'man IMPSYC-2' for more detail.
+**WARN: (IMPSYC-2):	Timing information is not defined for cell OA222x2_ASAP7_75t_R; Check the timing library (.lib) file and make sure the timing information exists for the cell and you can run the checkTimingLibrary command to verify if the timing library has complete information after the design is loaded.
+Type 'man IMPSYC-2' for more detail.
+**WARN: (EMS-27):	Message (IMPSYC-2) has exceeded the current message display limit of 20.
+To increase the message display limit, refer to the product command reference manual.
+Reading floorplan file - /home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/vec_mac_top_BF16/outputs/vec_mac_top_placed.enc.dat/vec_mac_top.fp.gz (mem = 1814.7M).
+% Begin Load floorplan data ... (date=04/26 14:22:46, mem=1661.6M)
+*info: reset 790044 existing net BottomPreferredLayer and AvoidDetour
+Deleting old partition specification.
+Set FPlanBox to (0 0 466776 466272)
+
+Honor LEF defined pitches for advanced node
+Start create_tracks
+ ... processed partition successfully.
+Reading binary special route file /home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/vec_mac_top_BF16/outputs/vec_mac_top_placed.enc.dat/vec_mac_top.fp.spr.gz (Created by Innovus v21.14-s109_1 on Sun Apr 26 13:08:13 2026, version: 1)
+Convert 0 swires and 0 svias from compressed groups
+0 swires and 0 svias were compressed
+0 swires and 0 svias were decompressed from small or sparse groups
+Ending "Read special route file" (total cpu=0:00:00.0, real=0:00:00.0, peak res=1662.1M, current mem=1662.1M)
+Extracting standard cell pins and blockage ...... 
+**WARN: (IMPTR-2104):	Layer M10: Pitch=80 is less than min width=40 + min spacing=2000.
+**ERROR: (IMPTR-2101):	Layer M10: Pitch=720x9 is still less than min width=2000 + min spacing=40.
+**WARN: (IMPTR-2108):	For layer M10, the gaps of 5826 out of 5826 tracks are narrower than 2.040um (space 2.000 + width 0.040).
+Type 'man IMPTR-2108' for more detail.
+ As a result, your trialRoute congestion could be incorrect.
+Pin and blockage extraction finished
+Delete all existing relative floorplan constraints.
+% End Load floorplan data ... (date=04/26 14:22:48, total cpu=0:00:01.3, real=0:00:02.0, peak res=1663.2M, current mem=1663.2M)
+Reading congestion map file /home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/vec_mac_top_BF16/outputs/vec_mac_top_placed.enc.dat/vec_mac_top.route.congmap.gz ...
+% Begin Load SymbolTable ... (date=04/26 14:22:48, mem=1663.2M)
+Suppress "**WARN ..." messages.
+Un-suppress "**WARN ..." messages.
+% End Load SymbolTable ... (date=04/26 14:22:50, total cpu=0:00:01.4, real=0:00:02.0, peak res=1828.8M, current mem=1828.6M)
+Loading place ...
+% Begin Load placement data ... (date=04/26 14:22:50, mem=1828.6M)
+Reading placement file - /home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/vec_mac_top_BF16/outputs/vec_mac_top_placed.enc.dat/vec_mac_top.place.gz.
+** Reading stdCellPlacement_binary (Created by Innovus v21.14-s109_1 on Sun Apr 26 13:08:14 2026, version# 2) ...
+Read Views for adaptive view pruning ...
+Read 0 views from Binary DB for adaptive view pruning
+*** Completed restorePlace (cpu=0:00:00.9 real=0:00:01.0 mem=2027.0M) ***
+Total net length = 8.848e+06 (4.743e+06 4.105e+06) (ext = 3.115e+05)
+% End Load placement data ... (date=04/26 14:22:51, total cpu=0:00:01.0, real=0:00:01.0, peak res=1898.0M, current mem=1894.4M)
+% Begin Load routing data ... (date=04/26 14:22:51, mem=1894.5M)
+Reading routing file - /home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/vec_mac_top_BF16/outputs/vec_mac_top_placed.enc.dat/vec_mac_top.route.gz.
+Reading Innovus routing data (Created by Innovus v21.14-s109_1 on Sun Apr 26 13:08:14 2026 Format: 20.1) ...
+*** Total 776475 nets are successfully restored.
+*** Completed restoreRoute (cpu=0:00:04.7 real=0:00:05.0 mem=3175.5M) ***
+% End Load routing data ... (date=04/26 14:22:56, total cpu=0:00:04.8, real=0:00:05.0, peak res=3042.0M, current mem=3033.7M)
+TAT_INFO: restoreCongMap REAL = 1 : CPU = 0 : MEM = 0.
+Reading property file /home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/vec_mac_top_BF16/outputs/vec_mac_top_placed.enc.dat/vec_mac_top.prop
+*** Completed restoreProperty (cpu=0:00:00.0 real=0:00:00.0 mem=3171.5M) ***
+Set Default Input Pin Transition as 0.1 ps.
+Extraction setup Started 
+Initializing multi-corner RC extraction with 2 active RC Corners ...
+**WARN: (IMPEXT-2773):	The via resistance between layers M0 and M1 could not be determined from the LEF technology file because the via resistance specification is missing. A default of 4 Ohms will be used as via resistance between these layers.
+Type 'man IMPEXT-2773' for more detail.
+**WARN: (IMPEXT-2773):	The via resistance between layers M1 and M2 could not be determined from the LEF technology file because the via resistance specification is missing. A default of 4 Ohms will be used as via resistance between these layers.
+Type 'man IMPEXT-2773' for more detail.
+**WARN: (IMPEXT-2773):	The via resistance between layers M2 and M3 could not be determined from the LEF technology file because the via resistance specification is missing. A default of 4 Ohms will be used as via resistance between these layers.
+Type 'man IMPEXT-2773' for more detail.
+**WARN: (IMPEXT-2773):	The via resistance between layers M3 and M4 could not be determined from the LEF technology file because the via resistance specification is missing. A default of 4 Ohms will be used as via resistance between these layers.
+Type 'man IMPEXT-2773' for more detail.
+**WARN: (IMPEXT-2773):	The via resistance between layers M4 and M5 could not be determined from the LEF technology file because the via resistance specification is missing. A default of 4 Ohms will be used as via resistance between these layers.
+Type 'man IMPEXT-2773' for more detail.
+**WARN: (IMPEXT-2773):	The via resistance between layers M5 and M6 could not be determined from the LEF technology file because the via resistance specification is missing. A default of 4 Ohms will be used as via resistance between these layers.
+Type 'man IMPEXT-2773' for more detail.
+**WARN: (IMPEXT-2773):	The via resistance between layers M6 and M7 could not be determined from the LEF technology file because the via resistance specification is missing. A default of 4 Ohms will be used as via resistance between these layers.
+Type 'man IMPEXT-2773' for more detail.
+**WARN: (IMPEXT-2773):	The via resistance between layers M7 and M8 could not be determined from the LEF technology file because the via resistance specification is missing. A default of 4 Ohms will be used as via resistance between these layers.
+Type 'man IMPEXT-2773' for more detail.
+**WARN: (IMPEXT-2773):	The via resistance between layers M8 and M9 could not be determined from the LEF technology file because the via resistance specification is missing. A default of 4 Ohms will be used as via resistance between these layers.
+Type 'man IMPEXT-2773' for more detail.
+**WARN: (IMPEXT-2773):	The via resistance between layers M9 and M10 could not be determined from the LEF technology file because the via resistance specification is missing. A default of 4 Ohms will be used as via resistance between these layers.
+Type 'man IMPEXT-2773' for more detail.
+**WARN: (IMPEXT-2766):	The sheet resistance for layer M1 is not defined in the cap table. Therefore, the LEF value 0.076 will be used instead. To avoid this message, update the relevant cap table to include the sheet resistance for the specified layer and read it back in.
+**WARN: (IMPEXT-2766):	The sheet resistance for layer M2 is not defined in the cap table. Therefore, the LEF value 0.076 will be used instead. To avoid this message, update the relevant cap table to include the sheet resistance for the specified layer and read it back in.
+**WARN: (IMPEXT-2766):	The sheet resistance for layer M3 is not defined in the cap table. Therefore, the LEF value 0.076 will be used instead. To avoid this message, update the relevant cap table to include the sheet resistance for the specified layer and read it back in.
+**WARN: (IMPEXT-2766):	The sheet resistance for layer M4 is not defined in the cap table. Therefore, the LEF value 0.076 will be used instead. To avoid this message, update the relevant cap table to include the sheet resistance for the specified layer and read it back in.
+**WARN: (IMPEXT-2766):	The sheet resistance for layer M5 is not defined in the cap table. Therefore, the LEF value 0.044 will be used instead. To avoid this message, update the relevant cap table to include the sheet resistance for the specified layer and read it back in.
+**WARN: (IMPEXT-2766):	The sheet resistance for layer M6 is not defined in the cap table. Therefore, the LEF value 0.076 will be used instead. To avoid this message, update the relevant cap table to include the sheet resistance for the specified layer and read it back in.
+**WARN: (IMPEXT-2766):	The sheet resistance for layer M7 is not defined in the cap table. Therefore, the LEF value 0.076 will be used instead. To avoid this message, update the relevant cap table to include the sheet resistance for the specified layer and read it back in.
+**WARN: (IMPEXT-2766):	The sheet resistance for layer M8 is not defined in the cap table. Therefore, the LEF value 0.076 will be used instead. To avoid this message, update the relevant cap table to include the sheet resistance for the specified layer and read it back in.
+**WARN: (IMPEXT-2766):	The sheet resistance for layer M9 is not defined in the cap table. Therefore, the LEF value 0.076 will be used instead. To avoid this message, update the relevant cap table to include the sheet resistance for the specified layer and read it back in.
+**WARN: (IMPEXT-2766):	The sheet resistance for layer M10 is not defined in the cap table. Therefore, the LEF value 0.076 will be used instead. To avoid this message, update the relevant cap table to include the sheet resistance for the specified layer and read it back in.
+**WARN: (IMPEXT-2773):	The via resistance between layers M0 and M1 could not be determined from the LEF technology file because the via resistance specification is missing. A default of 4 Ohms will be used as via resistance between these layers.
+Type 'man IMPEXT-2773' for more detail.
+**WARN: (IMPEXT-2773):	The via resistance between layers M1 and M2 could not be determined from the LEF technology file because the via resistance specification is missing. A default of 4 Ohms will be used as via resistance between these layers.
+Type 'man IMPEXT-2773' for more detail.
+**WARN: (IMPEXT-2773):	The via resistance between layers M2 and M3 could not be determined from the LEF technology file because the via resistance specification is missing. A default of 4 Ohms will be used as via resistance between these layers.
+Type 'man IMPEXT-2773' for more detail.
+**WARN: (IMPEXT-2773):	The via resistance between layers M3 and M4 could not be determined from the LEF technology file because the via resistance specification is missing. A default of 4 Ohms will be used as via resistance between these layers.
+Type 'man IMPEXT-2773' for more detail.
+**WARN: (IMPEXT-2773):	The via resistance between layers M4 and M5 could not be determined from the LEF technology file because the via resistance specification is missing. A default of 4 Ohms will be used as via resistance between these layers.
+Type 'man IMPEXT-2773' for more detail.
+**WARN: (IMPEXT-2773):	The via resistance between layers M5 and M6 could not be determined from the LEF technology file because the via resistance specification is missing. A default of 4 Ohms will be used as via resistance between these layers.
+Type 'man IMPEXT-2773' for more detail.
+**WARN: (IMPEXT-2773):	The via resistance between layers M6 and M7 could not be determined from the LEF technology file because the via resistance specification is missing. A default of 4 Ohms will be used as via resistance between these layers.
+Type 'man IMPEXT-2773' for more detail.
+**WARN: (IMPEXT-2773):	The via resistance between layers M7 and M8 could not be determined from the LEF technology file because the via resistance specification is missing. A default of 4 Ohms will be used as via resistance between these layers.
+Type 'man IMPEXT-2773' for more detail.
+**WARN: (IMPEXT-2773):	The via resistance between layers M8 and M9 could not be determined from the LEF technology file because the via resistance specification is missing. A default of 4 Ohms will be used as via resistance between these layers.
+Type 'man IMPEXT-2773' for more detail.
+**WARN: (IMPEXT-2773):	The via resistance between layers M9 and M10 could not be determined from the LEF technology file because the via resistance specification is missing. A default of 4 Ohms will be used as via resistance between these layers.
+Type 'man IMPEXT-2773' for more detail.
+**WARN: (IMPEXT-2766):	The sheet resistance for layer M1 is not defined in the cap table. Therefore, the LEF value 0.076 will be used instead. To avoid this message, update the relevant cap table to include the sheet resistance for the specified layer and read it back in.
+**WARN: (IMPEXT-2766):	The sheet resistance for layer M2 is not defined in the cap table. Therefore, the LEF value 0.076 will be used instead. To avoid this message, update the relevant cap table to include the sheet resistance for the specified layer and read it back in.
+**WARN: (IMPEXT-2766):	The sheet resistance for layer M3 is not defined in the cap table. Therefore, the LEF value 0.076 will be used instead. To avoid this message, update the relevant cap table to include the sheet resistance for the specified layer and read it back in.
+**WARN: (IMPEXT-2766):	The sheet resistance for layer M4 is not defined in the cap table. Therefore, the LEF value 0.076 will be used instead. To avoid this message, update the relevant cap table to include the sheet resistance for the specified layer and read it back in.
+**WARN: (IMPEXT-2766):	The sheet resistance for layer M5 is not defined in the cap table. Therefore, the LEF value 0.044 will be used instead. To avoid this message, update the relevant cap table to include the sheet resistance for the specified layer and read it back in.
+**WARN: (IMPEXT-2766):	The sheet resistance for layer M6 is not defined in the cap table. Therefore, the LEF value 0.076 will be used instead. To avoid this message, update the relevant cap table to include the sheet resistance for the specified layer and read it back in.
+**WARN: (IMPEXT-2766):	The sheet resistance for layer M7 is not defined in the cap table. Therefore, the LEF value 0.076 will be used instead. To avoid this message, update the relevant cap table to include the sheet resistance for the specified layer and read it back in.
+**WARN: (IMPEXT-2766):	The sheet resistance for layer M8 is not defined in the cap table. Therefore, the LEF value 0.076 will be used instead. To avoid this message, update the relevant cap table to include the sheet resistance for the specified layer and read it back in.
+**WARN: (IMPEXT-2766):	The sheet resistance for layer M9 is not defined in the cap table. Therefore, the LEF value 0.076 will be used instead. To avoid this message, update the relevant cap table to include the sheet resistance for the specified layer and read it back in.
+**WARN: (IMPEXT-2766):	The sheet resistance for layer M10 is not defined in the cap table. Therefore, the LEF value 0.076 will be used instead. To avoid this message, update the relevant cap table to include the sheet resistance for the specified layer and read it back in.
+Summary of Active RC-Corners : 
+ 
+ Analysis View: av_setup
+    RC-Corner Name        : rc_ss
+    RC-Corner Index       : 0
+    RC-Corner Temperature : 25 Celsius
+    RC-Corner Cap Table   : ''
+    RC-Corner PreRoute Res Factor         : 1.2
+    RC-Corner PreRoute Cap Factor         : 1.1
+    RC-Corner PostRoute Res Factor        : 1.2 {1.2 1 1}
+    RC-Corner PostRoute Cap Factor        : 1.1 {1.1 1 1}
+    RC-Corner PostRoute XCap Factor       : 1 {1 1 1}
+    RC-Corner PreRoute Clock Res Factor   : 1.2	[Derived from Cap Table]
+    RC-Corner PreRoute Clock Cap Factor   : 1.1	[Derived from Cap Table]
+    RC-Corner PostRoute Clock Cap Factor  : 1.1 {1.1 1 1} 	[Derived from postRoute_cap (effortLevel low)]
+    RC-Corner PostRoute Clock Res Factor  : 1.2 {1.2 1 1} 	[Derived from postRoute_res (effortLevel low)]
+    RC-Corner PostRoute Clock coupling capacitance Factor : 1 {1 1 1} 
+ 
+ Analysis View: av_hold
+    RC-Corner Name        : rc_ff
+    RC-Corner Index       : 1
+    RC-Corner Temperature : 25 Celsius
+    RC-Corner Cap Table   : ''
+    RC-Corner PreRoute Res Factor         : 0.9
+    RC-Corner PreRoute Cap Factor         : 0.9
+    RC-Corner PostRoute Res Factor        : 0.9 {0.9 1 1}
+    RC-Corner PostRoute Cap Factor        : 0.9 {0.9 1 1}
+    RC-Corner PostRoute XCap Factor       : 1 {1 1 1}
+    RC-Corner PreRoute Clock Res Factor   : 0.9	[Derived from Cap Table]
+    RC-Corner PreRoute Clock Cap Factor   : 0.9	[Derived from Cap Table]
+    RC-Corner PostRoute Clock Cap Factor  : 0.9 {0.9 1 1} 	[Derived from postRoute_cap (effortLevel low)]
+    RC-Corner PostRoute Clock Res Factor  : 0.9 {0.9 1 1} 	[Derived from postRoute_res (effortLevel low)]
+    RC-Corner PostRoute Clock coupling capacitance Factor : 1 {1 1 1} 
+Updating RC grid for preRoute extraction ...
+Initializing multi-corner resistance tables ...
+Start generating vias ..
+Extracting standard cell pins and blockage ...... 
+**WARN: (IMPTR-2104):	Layer M10: Pitch=80 is less than min width=40 + min spacing=2000.
+**ERROR: (IMPTR-2101):	Layer M10: Pitch=720x9 is still less than min width=2000 + min spacing=40.
+**WARN: (IMPTR-2108):	For layer M10, the gaps of 5826 out of 5826 tracks are narrower than 2.040um (space 2.000 + width 0.040).
+Type 'man IMPTR-2108' for more detail.
+ As a result, your trialRoute congestion could be incorrect.
+Pin and blockage extraction finished
+Via generation completed successfully.
+% Begin Load power constraints ... (date=04/26 14:23:01, mem=3049.9M)
+source /home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/vec_mac_top_BF16/outputs/vec_mac_top_placed.enc.dat/vec_mac_top_power_constraints.tcl
+% End Load power constraints ... (date=04/26 14:23:01, total cpu=0:00:00.1, real=0:00:00.0, peak res=3050.0M, current mem=3050.0M)
+% Begin load AAE data ... (date=04/26 14:23:01, mem=3094.0M)
+AAE DB initialization (MEM=3421.55 CPU=0:00:03.0 REAL=0:00:03.0) 
+% End load AAE data ... (date=04/26 14:23:05, total cpu=0:00:03.9, real=0:00:04.0, peak res=3270.0M, current mem=3270.0M)
+Total number of combinational cells: 56
+Total number of sequential cells: 0
+Total number of tristate cells: 0
+Total number of level shifter cells: 0
+Total number of power gating cells: 0
+Total number of isolation cells: 0
+Total number of power switch cells: 0
+Total number of pulse generator cells: 0
+Total number of always on buffers: 0
+Total number of retention cells: 0
+List of usable buffers:
+Total number of usable buffers: 0
+List of unusable buffers:
+Total number of unusable buffers: 0
+List of usable inverters:
+Total number of usable inverters: 0
+List of unusable inverters:
+Total number of unusable inverters: 0
+List of identified usable delay cells:
+Total number of identified usable delay cells: 0
+List of identified unusable delay cells:
+Total number of identified unusable delay cells: 0
+No delay cells were detected in the set of buffers. Buffers will be used to fix hold violations.
+#% End load design ... (date=04/26 14:23:05, total cpu=0:00:27.1, real=0:00:26.0, peak res=3270.1M, current mem=3214.1M)
+
+*** Summary of all messages that are not suppressed in this session:
+Severity  ID               Count  Summary                                  
+WARNING   IMPLF-108            1  There is no overlap layer defined in any...
+WARNING   IMPEXT-2766         20  The sheet resistance for layer %s is not...
+WARNING   IMPEXT-2773         20  The via resistance between layers %s and...
+WARNING   IMPSYC-2            88  Timing information is not defined for ce...
+WARNING   IMPOPT-3000          1  Buffer footprint is not defined or is an...
+WARNING   IMPOPT-3001          1  Inverter footprint is not defined or is ...
+ERROR     IMPTR-2101           2  Layer %s: Pitch=%dx%d is still less than...
+WARNING   IMPTR-2104           2  Layer %s: Pitch=%d is less than min widt...
+WARNING   IMPTR-2108           2  For layer M%d, the gaps of %d out of %d ...
+WARNING   TECHLIB-1277         4  The %s '%s' has been defined for %s %s '...
+*** Message Summary: 139 warning(s), 2 error(s)
+
+#% Begin routeDesign (date=04/26 14:23:06, mem=3213.8M)
+#routeDesign: cpu time = 00:00:00, elapsed time = 00:00:00, memory = 3213.80 (MB), peak = 3270.11 (MB)
+AAE_INFO: Pre Route call back at the beginning of routeDesign
+#**INFO: setDesignMode -flowEffort standard
+#**INFO: setDesignMode -powerEffort none
+**INFO: User settings:
+setNanoRouteMode -extractThirdPartyCompatible  false
+setExtractRCMode -defViaCap                    true
+setExtractRCMode -engine                       preRoute
+setDelayCalMode -engine                        aae
+setDelayCalMode -ignoreNetLoad                 false
+
+#rc_ss has no qx tech file defined
+#No active RC corner or QRC tech file is missing.
+#**INFO: multi-cut via swapping will be performed after routing.
+#**INFO: All auto set options tuned by routeDesign will be restored to their original settings on command completion.
+Begin checking placement ... (start mem=3374.6M, init mem=3573.6M)
+*info: Placed = 775391        
+*info: Unplaced = 0           
+Placement Density:45.00%(96253/213890)
+Placement Density (including fixed std cells):45.00%(96253/213890)
+Finished checkPlace (total: cpu=0:00:05.9, real=0:00:06.0; vio checks: cpu=0:00:04.6, real=0:00:05.0; mem=3784.6M)
+
+changeUseClockNetStatus Option :  -noFixedNetWires 
+*** Changed status on (0) nets in Clock.
+*** End changeUseClockNetStatus (cpu=0:00:00.0, real=0:00:00.0, mem=3784.6M) ***
+#**INFO: auto set of droutePostRouteSwapVia to multiCut
+% Begin globalDetailRoute (date=04/26 14:23:12, mem=3346.1M)
+
+globalDetailRoute
+
+#Start globalDetailRoute on Sun Apr 26 14:23:12 2026
+#
+#Generating timing data, please wait...
+#776475 total nets, 775899 already routed, 775899 will ignore in trialRoute
+**WARN: (IMPEXT-3530):	The process node is not set. Use the command setDesignMode -process <process node> prior to extraction for maximum accuracy and optimal automatic threshold setting.
+**WARN: (IMPEXT-6197):	The Cap table file is not specified. This will result in lower parasitic accuracy when using preRoute extraction or postRoute extraction with effort level 'low'. It is recommended to generate the Cap table file using the 'generateCapTbl' command and specify it before extraction using 'create_rc_corner/update_rc_corner -cap_table'.
+#Dump tif for version 2.1
+**WARN: (IMPEXT-2882):	Unable to find the resistance for via 'VIA12' in Cap table or LEF or OA files. The default value of 4.0 ohms is being assigned. To avoid this, check the Cap table and LEF and OA files, provide the resistance and read the files again.
+**WARN: (IMPEXT-2882):	Unable to find the resistance for via 'VIA23' in Cap table or LEF or OA files. The default value of 4.0 ohms is being assigned. To avoid this, check the Cap table and LEF and OA files, provide the resistance and read the files again.
+**WARN: (IMPEXT-2882):	Unable to find the resistance for via 'VIA34' in Cap table or LEF or OA files. The default value of 4.0 ohms is being assigned. To avoid this, check the Cap table and LEF and OA files, provide the resistance and read the files again.
+**WARN: (IMPEXT-2882):	Unable to find the resistance for via 'VIA45' in Cap table or LEF or OA files. The default value of 4.0 ohms is being assigned. To avoid this, check the Cap table and LEF and OA files, provide the resistance and read the files again.
+**WARN: (IMPEXT-2882):	Unable to find the resistance for via 'VIA56' in Cap table or LEF or OA files. The default value of 4.0 ohms is being assigned. To avoid this, check the Cap table and LEF and OA files, provide the resistance and read the files again.
+**WARN: (IMPEXT-2882):	Unable to find the resistance for via 'VIA67' in Cap table or LEF or OA files. The default value of 4.0 ohms is being assigned. To avoid this, check the Cap table and LEF and OA files, provide the resistance and read the files again.
+**WARN: (IMPEXT-2882):	Unable to find the resistance for via 'VIA78' in Cap table or LEF or OA files. The default value of 4.0 ohms is being assigned. To avoid this, check the Cap table and LEF and OA files, provide the resistance and read the files again.
+**WARN: (IMPEXT-2882):	Unable to find the resistance for via 'VIA89' in Cap table or LEF or OA files. The default value of 4.0 ohms is being assigned. To avoid this, check the Cap table and LEF and OA files, provide the resistance and read the files again.
+**WARN: (IMPEXT-2882):	Unable to find the resistance for via 'VIA9Pad' in Cap table or LEF or OA files. The default value of 4.0 ohms is being assigned. To avoid this, check the Cap table and LEF and OA files, provide the resistance and read the files again.
+**WARN: (IMPESI-3014):	The RC network is incomplete for net s_axis_tdata[506]. As a result, a lumped model will be used during delay calculation which may compromise timing accuracy. To resolve this, check parasitics for completeness, re-extraction may be required.
+**WARN: (IMPESI-3014):	The RC network is incomplete for net s_axis_tdata[477]. As a result, a lumped model will be used during delay calculation which may compromise timing accuracy. To resolve this, check parasitics for completeness, re-extraction may be required.
+**WARN: (IMPESI-3014):	The RC network is incomplete for net s_axis_tdata[414]. As a result, a lumped model will be used during delay calculation which may compromise timing accuracy. To resolve this, check parasitics for completeness, re-extraction may be required.
+**WARN: (IMPESI-3014):	The RC network is incomplete for net s_axis_tdata[319]. As a result, a lumped model will be used during delay calculation which may compromise timing accuracy. To resolve this, check parasitics for completeness, re-extraction may be required.
+**WARN: (IMPESI-3014):	The RC network is incomplete for net s_axis_tdata[258]. As a result, a lumped model will be used during delay calculation which may compromise timing accuracy. To resolve this, check parasitics for completeness, re-extraction may be required.
+**WARN: (IMPESI-3014):	The RC network is incomplete for net s_axis_tdata[246]. As a result, a lumped model will be used during delay calculation which may compromise timing accuracy. To resolve this, check parasitics for completeness, re-extraction may be required.
+**WARN: (IMPESI-3014):	The RC network is incomplete for net s_axis_tdata[196]. As a result, a lumped model will be used during delay calculation which may compromise timing accuracy. To resolve this, check parasitics for completeness, re-extraction may be required.
+**WARN: (IMPESI-3014):	The RC network is incomplete for net s_axis_tdata[190]. As a result, a lumped model will be used during delay calculation which may compromise timing accuracy. To resolve this, check parasitics for completeness, re-extraction may be required.
+**WARN: (IMPESI-3014):	The RC network is incomplete for net s_axis_tdata[78]. As a result, a lumped model will be used during delay calculation which may compromise timing accuracy. To resolve this, check parasitics for completeness, re-extraction may be required.
+**WARN: (IMPESI-3014):	The RC network is incomplete for net s_axis_tdata[1]. As a result, a lumped model will be used during delay calculation which may compromise timing accuracy. To resolve this, check parasitics for completeness, re-extraction may be required.
+Total number of fetched objects 776475
+AAE_INFO: Total number of nets for which stage creation was skipped for all views 0
+End delay calculation. (MEM=4988.05 CPU=0:00:39.8 REAL=0:00:40.0)
+
+#Generating timing data took: cpu time = 00:51:53, elapsed time = 00:51:46, memory = 3939.31 (MB), peak = 4825.82 (MB)
+#Done generating timing data.
+#create default rule from bind_ndr_rule rule=0x7fd1601f9500 0x7fd1092f7020
+#WARNING (NRDB-2012) The ENCLOSURE statement in layer V3 has the syntax for overhang values without END/SIDE keywords but contains CUTCLASS attribute and the cut defined in the CUTCLASS is rectangular. The new syntax 'END overhang1 SIDE overhang2' must be used in this case. Without the END/SIDE keywords, the larger value is assigned as end overhang and smaller value is assigned as side overhang. 
+#WARNING (NRDB-407) pitch for LAYER Pad is defined too small, reset to 160
+#WARNING (NRIG-1303) The congestion map does not match the GCELL grid. Clearing the map.
+#Invoke dbWirePreImport deleteTR=1 convert_unrouted=0 selected_only=0 (nr_selected_net=0)
+#num needed restored net=0
+#need_extraction net=0 (total=790044)
+#Start reading timing information from file .timing_file_1422.tif.gz ...
+#WARNING (NRDB-194) 
+#No setup time constraints read in
+#Read in timing information for 1042 ports, 775391 instances from timing file .timing_file_1422.tif.gz.
+#NanoRoute Version 21.14-s109_1 NR220628-1629/21_14-UB
+#Total number of trivial nets (e.g. < 2 pins) = 14145 (skipped).
+#Total number of routable nets = 775899.
+#Total number of nets in the design = 790044.
+#775899 routable nets do not have any wires.
+#775899 nets will be global routed.
+#Start routing data preparation on Sun Apr 26 15:15:28 2026
+#
+#Minimum voltage of a net in the design = 0.000.
+#Maximum voltage of a net in the design = 0.700.
+#Voltage range [0.000 - 0.700] has 790044 nets.
+#Build and mark too close pins for the same net.
+#Rebuild pin access data for design.
+#Initial pin access analysis.
+#Detail pin access analysis.
+# M1           V   Track-Pitch = 0.03600    Line-2-Via Pitch = 0.03600
+# M2           H   Track-Pitch = 0.03600    Line-2-Via Pitch = 0.03600
+# M3           V   Track-Pitch = 0.03600    Line-2-Via Pitch = 0.03600
+# M4           H   Track-Pitch = 0.04800    Line-2-Via Pitch = 0.04800
+# M5           V   Track-Pitch = 0.04800    Line-2-Via Pitch = 0.04800
+# M6           H   Track-Pitch = 0.06400    Line-2-Via Pitch = 0.06400
+# M7           V   Track-Pitch = 0.06400    Line-2-Via Pitch = 0.06400
+# M8           H   Track-Pitch = 0.08000    Line-2-Via Pitch = 0.08000
+# M9           V   Track-Pitch = 0.08000    Line-2-Via Pitch = 0.08000
+# Pad          H   Track-Pitch = 0.08000    Line-2-Via Pitch = 2.04000
+#WARNING (NRAG-44) Track pitch is too small compared with line-2-via pitch.
+#cpu time = 00:00:00, elapsed time = 00:00:00, memory = 4962.75 (MB), peak = 4962.94 (MB)
+#Regenerating Ggrids automatically.
+#Auto generating G-grids with size=15 tracks, using layer M3's pitch = 0.03600.
+#Using automatically generated G-grids.
+#(check_and_prepare_match_target_file) no match_target_file in constraint. quit
+#Done routing data preparation.
+#cpu time = 00:00:12, elapsed time = 00:00:12, memory = 4969.32 (MB), peak = 4970.21 (MB)
+#Start instance access analysis using 1 thread...
+#Set layer M1 to be advanced pin access layer.
+#0 instance pins are hard to access
+#Instance access analysis statistics:
+#Cpu time = 00:00:50
+#Elapsed time = 00:00:57
+#Increased memory = 156.64 (MB)
+#Total memory = 5134.15 (MB)
+#Peak memory = 5372.31 (MB)
+#
+#Finished routing data preparation on Sun Apr 26 15:16:40 2026
+#
+#Cpu time = 00:01:05
+#Elapsed time = 00:01:13
+#Increased memory = 291.43 (MB)
+#Total memory = 5134.20 (MB)
+#Peak memory = 5372.31 (MB)
+#
+#
+#Start global routing on Sun Apr 26 15:16:40 2026
+#
+#
+#Start global routing initialization on Sun Apr 26 15:16:40 2026
+#
+#Number of eco nets is 0
+#
+#Start global routing data preparation on Sun Apr 26 15:16:41 2026
+#
+#Start routing resource analysis on Sun Apr 26 15:16:41 2026
+#
+#Routing resource analysis is done on Sun Apr 26 15:16:46 2026
+#
+#  Resource Analysis:
+#
+#               Routing  #Avail      #Track     #Total     %Gcell
+#  Layer      Direction   Track     Blocked      Gcell    Blocked
+#  --------------------------------------------------------------
+#  M2             H       11145         941      745632     0.00%
+#  M3             V       12965           0      745632     0.00%
+#  M4             H        9498           0      745632     0.00%
+#  M5             V        9508           0      745632     0.00%
+#  M6             H        6909           0      745632     0.00%
+#  M7             V        6916           0      745632     0.00%
+#  M8             H        5827           0      745632     0.00%
+#  M9             V        5834           0      745632     0.00%
+#  Pad            H         863           0      745632     0.00%
+#  --------------------------------------------------------------
+#  Total                  69465       0.86%     6710688     0.00%
+#
+#
+#
+#
+#Global routing data preparation is done on Sun Apr 26 15:16:47 2026
+#
+#cpu time = 00:00:07, elapsed time = 00:00:07, memory = 5224.86 (MB), peak = 5372.31 (MB)
+#
+#
+#Global routing initialization is done on Sun Apr 26 15:16:49 2026
+#
+#cpu time = 00:00:08, elapsed time = 00:00:08, memory = 5249.55 (MB), peak = 5372.31 (MB)
+#
+#start global routing iteration 1...
+#cpu time = 00:00:55, elapsed time = 00:00:55, memory = 5374.63 (MB), peak = 5413.57 (MB)
+#
+#start global routing iteration 2...
+#cpu time = 00:00:41, elapsed time = 00:00:41, memory = 5547.41 (MB), peak = 5759.57 (MB)
+#
+#start global routing iteration 3...
+#cpu time = 00:00:32, elapsed time = 00:00:32, memory = 5549.30 (MB), peak = 5759.57 (MB)
+#
+#start global routing iteration 4...
+#cpu time = 00:01:07, elapsed time = 00:01:06, memory = 5620.53 (MB), peak = 5837.42 (MB)
+#
+#start global routing iteration 5...
+#cpu time = 00:05:07, elapsed time = 00:05:06, memory = 5735.14 (MB), peak = 5939.91 (MB)
+#
+#start global routing iteration 6...
+#    20% completed
+#    cpu time = 00:10:57, elapsed time = 00:10:55, memory = 5774.22 (MB), peak = 5939.91 (MB)
+#    100% completed
+#    cpu time = 00:45:38, elapsed time = 00:45:31, memory = 6067.60 (MB), peak = 6748.26 (MB)
+#cpu time = 00:45:38, elapsed time = 00:45:32, memory = 6067.60 (MB), peak = 6748.26 (MB)
+#
+#
+#Total number of trivial nets (e.g. < 2 pins) = 14145 (skipped).
+#Total number of routable nets = 775899.
+#Total number of nets in the design = 790044.
+#
+#775899 routable nets have routed wires.
+#
+#Routed nets constraints summary:
+#-----------------------------
+#        Rules   Unconstrained  
+#-----------------------------
+#      Default          775899  
+#-----------------------------
+#        Total          775899  
+#-----------------------------
+#
+#Routing constraints summary of the whole design:
+#-----------------------------
+#        Rules   Unconstrained  
+#-----------------------------
+#      Default          775899  
+#-----------------------------
+#        Total          775899  
+#-----------------------------
+#
+#
+#  Congestion Analysis: (blocked Gcells are excluded)
+#
+#                 OverCon       OverCon       OverCon          
+#                  #Gcell        #Gcell        #Gcell    %Gcell
+#     Layer           (1)           (2)           (3)   OverCon
+#  ------------------------------------------------------------
+#  M2           27(0.00%)      5(0.00%)      1(0.00%)   (0.00%)
+#  M3           15(0.00%)      5(0.00%)      1(0.00%)   (0.00%)
+#  M4          813(0.11%)     34(0.00%)      3(0.00%)   (0.11%)
+#  M5           10(0.00%)      0(0.00%)      0(0.00%)   (0.00%)
+#  M6          517(0.07%)      1(0.00%)      0(0.00%)   (0.07%)
+#  M7            6(0.00%)      0(0.00%)      0(0.00%)   (0.00%)
+#  M8            9(0.00%)      0(0.00%)      0(0.00%)   (0.00%)
+#  M9            0(0.00%)      0(0.00%)      0(0.00%)   (0.00%)
+#  Pad          26(0.00%)      0(0.00%)      0(0.00%)   (0.00%)
+#  ------------------------------------------------------------
+#     Total   1423(0.02%)     45(0.00%)      5(0.00%)   (0.02%)
+#
+#  The worst congested Gcell overcon (routing demand over resource in number of tracks) = 3
+#  Overflow after GR: 0.02% H + 0.00% V
+#
+#Hotspot report including placement blocked areas
+[hotspot] +------------+---------------+---------------+-------------------------------------+
+[hotspot] |   layer    |  max hotspot  | total hotspot |            hotspot bbox             |
+[hotspot] +------------+---------------+---------------+-------------------------------------+
+[hotspot] |   M1(V)    |         82.43 |       7205.20 |   185.76   453.60   194.40   462.24 |
+[hotspot] |   M2(H)    |          0.00 |          0.00 |   (none)                            |
+[hotspot] |   M3(V)    |          0.00 |          0.00 |   (none)                            |
+[hotspot] |   M4(H)    |          1.91 |        101.64 |   285.12   142.56   293.76   151.20 |
+[hotspot] |   M5(V)    |          0.17 |          0.17 |   164.16   211.68   172.80   220.32 |
+[hotspot] |   M6(H)    |          1.56 |         58.28 |   198.72   220.32   207.36   228.96 |
+[hotspot] |   M7(V)    |          0.17 |          0.17 |   285.12   203.04   293.76   211.68 |
+[hotspot] |   M8(H)    |          0.17 |          0.35 |   203.04   194.40   211.68   203.04 |
+[hotspot] |   M9(V)    |          0.00 |          0.00 |   (none)                            |
+[hotspot] |  Pad(H)    |        134.59 |       1041.08 |   302.40   142.56   311.04   151.20 |
+[hotspot] +------------+---------------+---------------+-------------------------------------+
+[hotspot] |   worst    |(Pad)   134.59 | (M1)  7205.20 |                                     |
+[hotspot] +------------+---------------+---------------+-------------------------------------+
+[hotspot] | all layers |          0.00 |          0.00 |                                     |
+[hotspot] +------------+---------------+---------------+-------------------------------------+
+Local HotSpot Analysis (blockage included) (3d): normalized congestion max/total hotspot area = 0.00/0.00 (area is in unit of 4 std-cell row bins)
+#Complete Global Routing.
+#Total wire length = 12765553 um.
+#Total half perimeter of net bounding box = 9059874 um.
+#Total wire length on LAYER M1 = 0 um.
+#Total wire length on LAYER M2 = 971481 um.
+#Total wire length on LAYER M3 = 2504876 um.
+#Total wire length on LAYER M4 = 2476043 um.
+#Total wire length on LAYER M5 = 1933386 um.
+#Total wire length on LAYER M6 = 1637235 um.
+#Total wire length on LAYER M7 = 1063055 um.
+#Total wire length on LAYER M8 = 1326594 um.
+#Total wire length on LAYER M9 = 832475 um.
+#Total wire length on LAYER Pad = 20408 um.
+#Total number of vias = 6279527
+#Up-Via Summary (total 6279527):
+#           
+#-----------------------
+# M1            2749663
+# M2            1666141
+# M3             784592
+# M4             392145
+# M5             276793
+# M6             187077
+# M7             147835
+# M8              69063
+# M9               6218
+#-----------------------
+#               6279527 
+#
+#Max overcon = 3 tracks.
+#Total overcon = 0.02%.
+#Worst layer Gcell overcon rate = 0.11%.
+#
+#Global routing statistics:
+#Cpu time = 00:54:27
+#Elapsed time = 00:54:19
+#Increased memory = 815.94 (MB)
+#Total memory = 5950.14 (MB)
+#Peak memory = 6748.26 (MB)
+#
+#Finished global routing on Sun Apr 26 16:11:00 2026
+#
+#
+#cpu time = 00:00:02, elapsed time = 00:00:02, memory = 5857.62 (MB), peak = 6748.26 (MB)
+#Start Track Assignment.
+#Done with 1907733 horizontal wires in 27 hboxes and 1581095 vertical wires in 27 hboxes.
+#Done with 458071 horizontal wires in 27 hboxes and 198904 vertical wires in 27 hboxes.
+#Done with 27 horizontal wires in 27 hboxes and 27 vertical wires in 27 hboxes.
+#
+#Track assignment summary:
+# layer   (wire length)   (overlap)     (long ovlp)	(with obs/pg/clk)  
+#------------------------------------------------------------------------
+# M2        968510.53 	  0.03%  	  0.00% 	  0.00%
+# M3       2522093.76 	  0.06%  	  0.00% 	  0.00%
+# M4       2477667.19 	  0.14%  	  0.00% 	  0.00%
+# M5       1936100.72 	  0.04%  	  0.00% 	  0.00%
+# M6       1640700.35 	  0.11%  	  0.00% 	  0.00%
+# M7       1065219.55 	  0.03%  	  0.00% 	  0.00%
+# M8       1329134.56 	  0.10%  	  0.01% 	  0.00%
+# M9        833589.80 	  0.04%  	  0.00% 	  0.00%
+# Pad        20507.48 	  0.00%  	  0.00% 	  0.00%
+#------------------------------------------------------------------------
+# All     12793523.95  	  0.08% 	  0.00% 	  0.00%
+#Complete Track Assignment.
+#Total wire length = 12751670 um.
+#Total half perimeter of net bounding box = 9059874 um.
+#Total wire length on LAYER M1 = 0 um.
+#Total wire length on LAYER M2 = 959151 um.
+#Total wire length on LAYER M3 = 2515724 um.
+#Total wire length on LAYER M4 = 2469441 um.
+#Total wire length on LAYER M5 = 1931554 um.
+#Total wire length on LAYER M6 = 1635818 um.
+#Total wire length on LAYER M7 = 1061647 um.
+#Total wire length on LAYER M8 = 1325743 um.
+#Total wire length on LAYER M9 = 832210 um.
+#Total wire length on LAYER Pad = 20383 um.
+#Total number of vias = 6279528
+#Up-Via Summary (total 6279528):
+#           
+#-----------------------
+# M1            2749664
+# M2            1666141
+# M3             784592
+# M4             392145
+# M5             276793
+# M6             187077
+# M7             147835
+# M8              69063
+# M9               6218
+#-----------------------
+#               6279528 
+#
+#cpu time = 00:04:19, elapsed time = 00:04:18, memory = 5857.89 (MB), peak = 6748.26 (MB)
+#
+#Routing data preparation, pin analysis, global routing and track assignment statistics:
+#Cpu time = 01:00:04
+#Elapsed time = 01:00:03
+#Increased memory = 1015.26 (MB)
+#Total memory = 5857.97 (MB)
+#Peak memory = 6748.26 (MB)
+#
+#Start Detail Routing...
+#start initial detail routing ...
+#    completing 10% with 6016 violations
+#    elapsed time = 00:07:10, memory = 6270.46 (MB)
+#    completing 20% with 10992 violations
+#    elapsed time = 00:14:09, memory = 6327.06 (MB)
+#    completing 30% with 14327 violations
+#    elapsed time = 00:21:36, memory = 6327.58 (MB)
+#    completing 40% with 16341 violations
+#    elapsed time = 00:28:33, memory = 6359.38 (MB)
+#    completing 50% with 17326 violations
+#    elapsed time = 00:35:33, memory = 6319.44 (MB)
+#    completing 60% with 19654 violations
+#    elapsed time = 00:42:43, memory = 6348.27 (MB)
+#    completing 70% with 21051 violations
+#    elapsed time = 00:49:29, memory = 6395.02 (MB)
+#    completing 80% with 20826 violations
+#    elapsed time = 00:56:37, memory = 6455.83 (MB)
+#    completing 90% with 19815 violations
+#    elapsed time = 01:03:06, memory = 6450.39 (MB)
+#    completing 100% with 18122 violations
+#    elapsed time = 01:09:39, memory = 6414.35 (MB)
+#   number of violations = 18122
+#
+#    By Layer and Type :
+#	         MetSpc   EOLSpc    Short   CutSpc    EolKO   CorSpc   Others   Totals
+#	M1            0        0        0        0        0        0        0        0
+#	M2          622     1990       42        0     3926      158        0     6738
+#	M3          699      635      848     1364      895        2       10     4453
+#	M4          149      461      149     1038      925        5        3     2730
+#	M5           80      122       63     1351      448        2        6     2072
+#	M6           53       77       61      678      213        1        3     1086
+#	M7           86       86       40      112      137        0        0      461
+#	M8          124        0      133      187        0        0        5      449
+#	M9            0        0       23        3        0        0        2       28
+#	Pad         105        0        0        0        0        0        0      105
+#	Totals     1918     3371     1359     4733     6544      168       29    18122
+#cpu time = 01:10:02, elapsed time = 01:09:56, memory = 6083.29 (MB), peak = 6748.26 (MB)
+#start 1st optimization iteration ...
+#    completing 10% with 16189 violations
+#    elapsed time = 00:00:43, memory = 6239.55 (MB)
+#    completing 20% with 14181 violations
+#    elapsed time = 00:01:27, memory = 6238.64 (MB)
+#    completing 30% with 12210 violations
+#    elapsed time = 00:02:08, memory = 6240.17 (MB)
+#    completing 40% with 10551 violations
+#    elapsed time = 00:02:45, memory = 6241.18 (MB)
+#    completing 50% with 8861 violations
+#    elapsed time = 00:03:23, memory = 6240.11 (MB)
+#    completing 60% with 7347 violations
+#    elapsed time = 00:03:57, memory = 6239.76 (MB)
+#    completing 70% with 5855 violations
+#    elapsed time = 00:04:32, memory = 6206.78 (MB)
+#    completing 80% with 4461 violations
+#    elapsed time = 00:05:04, memory = 6200.54 (MB)
+#    completing 90% with 3101 violations
+#    elapsed time = 00:05:37, memory = 6205.30 (MB)
+#    completing 100% with 1907 violations
+#    elapsed time = 00:06:07, memory = 6197.76 (MB)
+#   number of violations = 1907
+#
+#    By Layer and Type :
+#	         MetSpc   EOLSpc    Short     Loop   CutSpc    EolKO   CorSpc   Totals
+#	M1            0        0        0        0        0        0        0        0
+#	M2            7      236        0        0        0     1419        4     1666
+#	M3            1        3        1        0        0       49        0       54
+#	M4            1        1        0        0        2       87        0       91
+#	M5            0        0        0        0        3       38        0       41
+#	M6            0        0        0        0        1       22        0       23
+#	M7            0        0        0        1        0       17        0       18
+#	M8            0        0        1        0        0        0        0        1
+#	M9            0        0        3        0        0        0        0        3
+#	Pad          10        0        0        0        0        0        0       10
+#	Totals       19      240        5        1        6     1632        4     1907
+#cpu time = 00:06:19, elapsed time = 00:06:19, memory = 6096.74 (MB), peak = 6748.26 (MB)
+#start 2nd optimization iteration ...
+#   number of violations = 617
+#
+#    By Layer and Type :
+#	         MetSpc   EOLSpc    EolKO   Totals
+#	M1            0        0        0        0
+#	M2            0       64      525      589
+#	M3            0        0        3        3
+#	M4            0        1        7        8
+#	M5            0        0        6        6
+#	M6            0        0        3        3
+#	M7            0        0        2        2
+#	M8            0        0        0        0
+#	M9            0        0        0        0
+#	Pad           6        0        0        6
+#	Totals        6       65      546      617
+#cpu time = 00:01:03, elapsed time = 00:01:02, memory = 6095.12 (MB), peak = 6748.26 (MB)
+#start 3rd optimization iteration ...
+#   number of violations = 269
+#
+#    By Layer and Type :
+#	         MetSpc   EOLSpc    EolKO   Totals
+#	M1            0        0        0        0
+#	M2            0       22      240      262
+#	M3            0        0        2        2
+#	M4            0        0        0        0
+#	M5            0        0        0        0
+#	M6            0        0        0        0
+#	M7            0        0        0        0
+#	M8            0        0        0        0
+#	M9            0        0        0        0
+#	Pad           5        0        0        5
+#	Totals        5       22      242      269
+#cpu time = 00:00:33, elapsed time = 00:00:33, memory = 6094.02 (MB), peak = 6748.26 (MB)
+#start 4th optimization iteration ...
+#   number of violations = 121
+#
+#    By Layer and Type :
+#	         MetSpc   EOLSpc    EolKO   Totals
+#	M1            0        0        0        0
+#	M2            0       13      104      117
+#	M3            0        0        0        0
+#	M4            0        0        0        0
+#	M5            0        0        0        0
+#	M6            0        0        0        0
+#	M7            0        0        0        0
+#	M8            0        0        0        0
+#	M9            0        0        0        0
+#	Pad           4        0        0        4
+#	Totals        4       13      104      121
+#cpu time = 00:00:23, elapsed time = 00:00:23, memory = 6093.91 (MB), peak = 6748.26 (MB)
+#start 5th optimization iteration ...
+#   number of violations = 78
+#
+#    By Layer and Type :
+#	         MetSpc   EOLSpc    EolKO   Totals
+#	M1            0        0        0        0
+#	M2            0        7       66       73
+#	M3            0        0        0        0
+#	M4            0        0        0        0
+#	M5            0        0        0        0
+#	M6            0        0        0        0
+#	M7            0        0        0        0
+#	M8            0        0        0        0
+#	M9            0        0        0        0
+#	Pad           5        0        0        5
+#	Totals        5        7       66       78
+#cpu time = 00:00:17, elapsed time = 00:00:17, memory = 6095.21 (MB), peak = 6748.26 (MB)
+#start 6th optimization iteration ...
+#   number of violations = 43
+#
+#    By Layer and Type :
+#	         MetSpc   EOLSpc    EolKO   Totals
+#	M1            0        0        0        0
+#	M2            0        3       37       40
+#	M3            0        0        0        0
+#	M4            0        0        0        0
+#	M5            0        0        0        0
+#	M6            0        0        0        0
+#	M7            0        0        0        0
+#	M8            0        0        0        0
+#	M9            0        0        0        0
+#	Pad           3        0        0        3
+#	Totals        3        3       37       43
+#cpu time = 00:00:14, elapsed time = 00:00:14, memory = 6095.50 (MB), peak = 6748.26 (MB)
+#start 7th optimization iteration ...
+#   number of violations = 33
+#
+#    By Layer and Type :
+#	         MetSpc   EOLSpc    EolKO   Totals
+#	M1            0        0        0        0
+#	M2            0        4       26       30
+#	M3            0        0        0        0
+#	M4            0        0        0        0
+#	M5            0        0        0        0
+#	M6            0        0        0        0
+#	M7            0        0        0        0
+#	M8            0        0        0        0
+#	M9            0        0        0        0
+#	Pad           3        0        0        3
+#	Totals        3        4       26       33
+#cpu time = 00:00:09, elapsed time = 00:00:09, memory = 6095.59 (MB), peak = 6748.26 (MB)
+#start 8th optimization iteration ...
+#   number of violations = 24
+#
+#    By Layer and Type :
+#	         MetSpc   EOLSpc    EolKO   Totals
+#	M1            0        0        0        0
+#	M2            0        1       19       20
+#	M3            0        0        0        0
+#	M4            0        0        0        0
+#	M5            0        0        0        0
+#	M6            0        0        0        0
+#	M7            0        0        0        0
+#	M8            0        0        0        0
+#	M9            0        0        0        0
+#	Pad           4        0        0        4
+#	Totals        4        1       19       24
+#cpu time = 00:00:09, elapsed time = 00:00:09, memory = 6095.55 (MB), peak = 6748.26 (MB)
+#start 9th optimization iteration ...
+#   number of violations = 17
+#
+#    By Layer and Type :
+#	         MetSpc    EolKO   Totals
+#	M1            0        0        0
+#	M2            0       14       14
+#	M3            0        0        0
+#	M4            0        0        0
+#	M5            0        0        0
+#	M6            0        0        0
+#	M7            0        0        0
+#	M8            0        0        0
+#	M9            0        0        0
+#	Pad           3        0        3
+#	Totals        3       14       17
+#cpu time = 00:00:07, elapsed time = 00:00:07, memory = 6095.56 (MB), peak = 6748.26 (MB)
+#start 10th optimization iteration ...
+#   number of violations = 16
+#
+#    By Layer and Type :
+#	         MetSpc    Short    EolKO   Totals
+#	M1            0        0        0        0
+#	M2            0        0       13       13
+#	M3            0        0        0        0
+#	M4            0        0        0        0
+#	M5            0        0        0        0
+#	M6            0        0        0        0
+#	M7            0        0        0        0
+#	M8            0        0        0        0
+#	M9            0        1        0        1
+#	Pad           2        0        0        2
+#	Totals        2        1       13       16
+#cpu time = 00:00:07, elapsed time = 00:00:07, memory = 6095.26 (MB), peak = 6748.26 (MB)
+#start 11th optimization iteration ...
+#   number of violations = 9
+#
+#    By Layer and Type :
+#	         MetSpc    EolKO   Totals
+#	M1            0        0        0
+#	M2            0        8        8
+#	M3            0        0        0
+#	M4            0        0        0
+#	M5            0        0        0
+#	M6            0        0        0
+#	M7            0        0        0
+#	M8            0        0        0
+#	M9            0        0        0
+#	Pad           1        0        1
+#	Totals        1        8        9
+#cpu time = 00:00:08, elapsed time = 00:00:08, memory = 6095.13 (MB), peak = 6748.26 (MB)
+#start 12th optimization iteration ...
+#   number of violations = 6
+#
+#    By Layer and Type :
+#	         MetSpc    EolKO   Totals
+#	M1            0        0        0
+#	M2            0        5        5
+#	M3            0        0        0
+#	M4            0        0        0
+#	M5            0        0        0
+#	M6            0        0        0
+#	M7            0        0        0
+#	M8            0        0        0
+#	M9            0        0        0
+#	Pad           1        0        1
+#	Totals        1        5        6
+#cpu time = 00:00:07, elapsed time = 00:00:07, memory = 6095.13 (MB), peak = 6748.26 (MB)
+#start 13th optimization iteration ...
+#   number of violations = 3
+#
+#    By Layer and Type :
+#	         MetSpc    EolKO   Totals
+#	M1            0        0        0
+#	M2            0        2        2
+#	M3            0        0        0
+#	M4            0        0        0
+#	M5            0        0        0
+#	M6            0        0        0
+#	M7            0        0        0
+#	M8            0        0        0
+#	M9            0        0        0
+#	Pad           1        0        1
+#	Totals        1        2        3
+#cpu time = 00:00:07, elapsed time = 00:00:07, memory = 6094.84 (MB), peak = 6748.26 (MB)
+#start 14th optimization iteration ...
+#   number of violations = 3
+#
+#    By Layer and Type :
+#	         MetSpc    EolKO   Totals
+#	M1            0        0        0
+#	M2            0        2        2
+#	M3            0        0        0
+#	M4            0        0        0
+#	M5            0        0        0
+#	M6            0        0        0
+#	M7            0        0        0
+#	M8            0        0        0
+#	M9            0        0        0
+#	Pad           1        0        1
+#	Totals        1        2        3
+#cpu time = 00:00:06, elapsed time = 00:00:06, memory = 6095.13 (MB), peak = 6748.26 (MB)
+#start 15th optimization iteration ...
+#   number of violations = 2
+#
+#    By Layer and Type :
+#	         MetSpc    EolKO   Totals
+#	M1            0        0        0
+#	M2            0        1        1
+#	M3            0        0        0
+#	M4            0        0        0
+#	M5            0        0        0
+#	M6            0        0        0
+#	M7            0        0        0
+#	M8            0        0        0
+#	M9            0        0        0
+#	Pad           1        0        1
+#	Totals        1        1        2
+#cpu time = 00:00:07, elapsed time = 00:00:07, memory = 6094.85 (MB), peak = 6748.26 (MB)
+#start 16th optimization iteration ...
+#   number of violations = 2
+#
+#    By Layer and Type :
+#	         MetSpc    EolKO   Totals
+#	M1            0        0        0
+#	M2            0        1        1
+#	M3            0        0        0
+#	M4            0        0        0
+#	M5            0        0        0
+#	M6            0        0        0
+#	M7            0        0        0
+#	M8            0        0        0
+#	M9            0        0        0
+#	Pad           1        0        1
+#	Totals        1        1        2
+#cpu time = 00:00:06, elapsed time = 00:00:06, memory = 6094.89 (MB), peak = 6748.26 (MB)
+#start 17th optimization iteration ...
+#   number of violations = 1
+#
+#    By Layer and Type :
+#	          EolKO   Totals
+#	M1            0        0
+#	M2            1        1
+#	Totals        1        1
+#cpu time = 00:00:07, elapsed time = 00:00:07, memory = 6095.46 (MB), peak = 6748.26 (MB)
+#start 18th optimization iteration ...
+#   number of violations = 1
+#
+#    By Layer and Type :
+#	          EolKO   Totals
+#	M1            0        0
+#	M2            1        1
+#	Totals        1        1
+#cpu time = 00:00:07, elapsed time = 00:00:07, memory = 6097.07 (MB), peak = 6748.26 (MB)
+#Complete Detail Routing.
+#Total wire length = 13059288 um.
+#Total half perimeter of net bounding box = 9059874 um.
+#Total wire length on LAYER M1 = 0 um.
+#Total wire length on LAYER M2 = 1226320 um.
+#Total wire length on LAYER M3 = 2718738 um.
+#Total wire length on LAYER M4 = 2322192 um.
+#Total wire length on LAYER M5 = 1931029 um.
+#Total wire length on LAYER M6 = 1626481 um.
+#Total wire length on LAYER M7 = 1065198 um.
+#Total wire length on LAYER M8 = 1333193 um.
+#Total wire length on LAYER M9 = 831759 um.
+#Total wire length on LAYER Pad = 4380 um.
+#Total number of vias = 8001986
+#Up-Via Summary (total 8001986):
+#           
+#-----------------------
+# M1            2857019
+# M2            3250605
+# M3             763462
+# M4             419571
+# M5             287166
+# M6             196326
+# M7             151239
+# M8              74359
+# M9               2239
+#-----------------------
+#               8001986 
+#
+#Total number of DRC violations = 1
+#Total number of violations on LAYER M1 = 0
+#Total number of violations on LAYER M2 = 1
+#Total number of violations on LAYER M3 = 0
+#Total number of violations on LAYER M4 = 0
+#Total number of violations on LAYER M5 = 0
+#Total number of violations on LAYER M6 = 0
+#Total number of violations on LAYER M7 = 0
+#Total number of violations on LAYER M8 = 0
+#Total number of violations on LAYER M9 = 0
+#Total number of violations on LAYER Pad = 0
+#Cpu time = 01:20:50
+#Elapsed time = 01:20:43
+#Increased memory = 239.09 (MB)
+#Total memory = 6097.06 (MB)
+#Peak memory = 6748.26 (MB)
+#
+#Start Post Route via swapping...
+#93.10% of area are rerouted by ECO routing.
+#   number of violations = 1
+#
+#    By Layer and Type :
+#	          EolKO   Totals
+#	M1            0        0
+#	M2            1        1
+#	Totals        1        1
+#cpu time = 00:06:08, elapsed time = 00:06:08, memory = 6283.79 (MB), peak = 6748.26 (MB)
+#CELL_VIEW vec_mac_top,init has 1 DRC violations
+#Total number of DRC violations = 1
+#Total number of violations on LAYER M1 = 0
+#Total number of violations on LAYER M2 = 1
+#Total number of violations on LAYER M3 = 0
+#Total number of violations on LAYER M4 = 0
+#Total number of violations on LAYER M5 = 0
+#Total number of violations on LAYER M6 = 0
+#Total number of violations on LAYER M7 = 0
+#Total number of violations on LAYER M8 = 0
+#Total number of violations on LAYER M9 = 0
+#Total number of violations on LAYER Pad = 0
+#Post Route via swapping is done.
+#Total wire length = 13059288 um.
+#Total half perimeter of net bounding box = 9059874 um.
+#Total wire length on LAYER M1 = 0 um.
+#Total wire length on LAYER M2 = 1226320 um.
+#Total wire length on LAYER M3 = 2718738 um.
+#Total wire length on LAYER M4 = 2322192 um.
+#Total wire length on LAYER M5 = 1931029 um.
+#Total wire length on LAYER M6 = 1626481 um.
+#Total wire length on LAYER M7 = 1065198 um.
+#Total wire length on LAYER M8 = 1333193 um.
+#Total wire length on LAYER M9 = 831759 um.
+#Total wire length on LAYER Pad = 4380 um.
+#Total number of vias = 8001986
+#Total number of multi-cut vias = 99555 (  1.2%)
+#Total number of single cut vias = 7902431 ( 98.8%)
+#Up-Via Summary (total 8001986):
+#                   single-cut          multi-cut      Total
+#-----------------------------------------------------------
+# M1           2857019 (100.0%)         0 (  0.0%)    2857019
+# M2           3250605 (100.0%)         0 (  0.0%)    3250605
+# M3            763462 (100.0%)         0 (  0.0%)     763462
+# M4            419571 (100.0%)         0 (  0.0%)     419571
+# M5            287166 (100.0%)         0 (  0.0%)     287166
+# M6            196326 (100.0%)         0 (  0.0%)     196326
+# M7             80102 ( 53.0%)     71137 ( 47.0%)     151239
+# M8             48123 ( 64.7%)     26236 ( 35.3%)      74359
+# M9                57 (  2.5%)      2182 ( 97.5%)       2239
+#-----------------------------------------------------------
+#              7902431 ( 98.8%)     99555 (  1.2%)    8001986 
+#
+#
+#Start Post Route wire spreading..
+#
+#Start DRC checking..
+#   number of violations = 1
+#
+#    By Layer and Type :
+#	          EolKO   Totals
+#	M1            0        0
+#	M2            1        1
+#	Totals        1        1
+#cpu time = 00:11:27, elapsed time = 00:11:25, memory = 6302.18 (MB), peak = 6748.26 (MB)
+#CELL_VIEW vec_mac_top,init has 1 DRC violations
+#Total number of DRC violations = 1
+#Total number of violations on LAYER M1 = 0
+#Total number of violations on LAYER M2 = 1
+#Total number of violations on LAYER M3 = 0
+#Total number of violations on LAYER M4 = 0
+#Total number of violations on LAYER M5 = 0
+#Total number of violations on LAYER M6 = 0
+#Total number of violations on LAYER M7 = 0
+#Total number of violations on LAYER M8 = 0
+#Total number of violations on LAYER M9 = 0
+#Total number of violations on LAYER Pad = 0
+#
+#Start data preparation for wire spreading...
+#
+#Data preparation is done on Sun Apr 26 17:54:25 2026
+#
+#
+#Start Post Route Wire Spread.
+#Done with 61958 horizontal wires in 54 hboxes and 35749 vertical wires in 54 hboxes.
+#Complete Post Route Wire Spread.
+#
+#Total wire length = 13075060 um.
+#Total half perimeter of net bounding box = 9059874 um.
+#Total wire length on LAYER M1 = 0 um.
+#Total wire length on LAYER M2 = 1226320 um.
+#Total wire length on LAYER M3 = 2718738 um.
+#Total wire length on LAYER M4 = 2322192 um.
+#Total wire length on LAYER M5 = 1931029 um.
+#Total wire length on LAYER M6 = 1626481 um.
+#Total wire length on LAYER M7 = 1065198 um.
+#Total wire length on LAYER M8 = 1342945 um.
+#Total wire length on LAYER M9 = 837779 um.
+#Total wire length on LAYER Pad = 4380 um.
+#Total number of vias = 8001986
+#Total number of multi-cut vias = 99555 (  1.2%)
+#Total number of single cut vias = 7902431 ( 98.8%)
+#Up-Via Summary (total 8001986):
+#                   single-cut          multi-cut      Total
+#-----------------------------------------------------------
+# M1           2857019 (100.0%)         0 (  0.0%)    2857019
+# M2           3250605 (100.0%)         0 (  0.0%)    3250605
+# M3            763462 (100.0%)         0 (  0.0%)     763462
+# M4            419571 (100.0%)         0 (  0.0%)     419571
+# M5            287166 (100.0%)         0 (  0.0%)     287166
+# M6            196326 (100.0%)         0 (  0.0%)     196326
+# M7             80102 ( 53.0%)     71137 ( 47.0%)     151239
+# M8             48123 ( 64.7%)     26236 ( 35.3%)      74359
+# M9                57 (  2.5%)      2182 ( 97.5%)       2239
+#-----------------------------------------------------------
+#              7902431 ( 98.8%)     99555 (  1.2%)    8001986 
+#
+#
+#Start DRC checking..
+#   number of violations = 62
+#
+#    By Layer and Type :
+#	         MetSpc    EolKO   Totals
+#	M1            0        0        0
+#	M2            0        1        1
+#	M3            0        0        0
+#	M4            0        0        0
+#	M5            0        0        0
+#	M6            0        0        0
+#	M7            0        0        0
+#	M8           61        0       61
+#	Totals       61        1       62
+#cpu time = 00:13:00, elapsed time = 00:12:59, memory = 6287.90 (MB), peak = 6748.26 (MB)
+#CELL_VIEW vec_mac_top,init has 62 DRC violations
+#Total number of DRC violations = 62
+#Total number of violations on LAYER M1 = 0
+#Total number of violations on LAYER M2 = 1
+#Total number of violations on LAYER M3 = 0
+#Total number of violations on LAYER M4 = 0
+#Total number of violations on LAYER M5 = 0
+#Total number of violations on LAYER M6 = 0
+#Total number of violations on LAYER M7 = 0
+#Total number of violations on LAYER M8 = 61
+#Total number of violations on LAYER M9 = 0
+#Total number of violations on LAYER Pad = 0
+#   number of violations = 62
+#
+#    By Layer and Type :
+#	         MetSpc    EolKO   Totals
+#	M1            0        0        0
+#	M2            0        1        1
+#	M3            0        0        0
+#	M4            0        0        0
+#	M5            0        0        0
+#	M6            0        0        0
+#	M7            0        0        0
+#	M8           61        0       61
+#	Totals       61        1       62
+#cpu time = 00:15:04, elapsed time = 00:15:03, memory = 6287.90 (MB), peak = 6748.26 (MB)
+#CELL_VIEW vec_mac_top,init has 62 DRC violations
+#Total number of DRC violations = 62
+#Total number of violations on LAYER M1 = 0
+#Total number of violations on LAYER M2 = 1
+#Total number of violations on LAYER M3 = 0
+#Total number of violations on LAYER M4 = 0
+#Total number of violations on LAYER M5 = 0
+#Total number of violations on LAYER M6 = 0
+#Total number of violations on LAYER M7 = 0
+#Total number of violations on LAYER M8 = 61
+#Total number of violations on LAYER M9 = 0
+#Total number of violations on LAYER Pad = 0
+#Post Route wire spread is done.
+#Total wire length = 13075060 um.
+#Total half perimeter of net bounding box = 9059874 um.
+#Total wire length on LAYER M1 = 0 um.
+#Total wire length on LAYER M2 = 1226320 um.
+#Total wire length on LAYER M3 = 2718738 um.
+#Total wire length on LAYER M4 = 2322192 um.
+#Total wire length on LAYER M5 = 1931029 um.
+#Total wire length on LAYER M6 = 1626481 um.
+#Total wire length on LAYER M7 = 1065198 um.
+#Total wire length on LAYER M8 = 1342945 um.
+#Total wire length on LAYER M9 = 837779 um.
+#Total wire length on LAYER Pad = 4380 um.
+#Total number of vias = 8001986
+#Total number of multi-cut vias = 99555 (  1.2%)
+#Total number of single cut vias = 7902431 ( 98.8%)
+#Up-Via Summary (total 8001986):
+#                   single-cut          multi-cut      Total
+#-----------------------------------------------------------
+# M1           2857019 (100.0%)         0 (  0.0%)    2857019
+# M2           3250605 (100.0%)         0 (  0.0%)    3250605
+# M3            763462 (100.0%)         0 (  0.0%)     763462
+# M4            419571 (100.0%)         0 (  0.0%)     419571
+# M5            287166 (100.0%)         0 (  0.0%)     287166
+# M6            196326 (100.0%)         0 (  0.0%)     196326
+# M7             80102 ( 53.0%)     71137 ( 47.0%)     151239
+# M8             48123 ( 64.7%)     26236 ( 35.3%)      74359
+# M9                57 (  2.5%)      2182 ( 97.5%)       2239
+#-----------------------------------------------------------
+#              7902431 ( 98.8%)     99555 (  1.2%)    8001986 
+#
+#detailRoute Statistics:
+#Cpu time = 01:54:16
+#Elapsed time = 01:54:05
+#Increased memory = 430.01 (MB)
+#Total memory = 6287.98 (MB)
+#Peak memory = 6748.26 (MB)
+#	no debugging net set
+#
+#globalDetailRoute statistics:
+#Cpu time = 03:47:16
+#Elapsed time = 03:46:58
+#Increased memory = 1141.71 (MB)
+#Total memory = 4487.77 (MB)
+#Peak memory = 6748.26 (MB)
+#Number of warnings = 5
+#Total number of warnings = 8
+#Number of fails = 0
+#Total number of fails = 0
+#Complete globalDetailRoute on Sun Apr 26 18:10:10 2026
+#
+% End globalDetailRoute (date=04/26 18:10:10, total cpu=3:47:16, real=3:46:58, peak res=6748.3M, current mem=4482.2M)
+#Default setup view is reset to av_setup.
+#Default setup view is reset to av_setup.
+AAE_INFO: Post Route call back at the end of routeDesign
+#routeDesign: cpu time = 03:47:23, elapsed time = 03:47:05, memory = 4160.92 (MB), peak = 6748.26 (MB)
+
+*** Summary of all messages that are not suppressed in this session:
+Severity  ID               Count  Summary                                  
+WARNING   IMPEXT-6197          1  The Cap table file is not specified. Thi...
+WARNING   IMPEXT-2882          9  Unable to find the resistance for via '%...
+WARNING   IMPEXT-3530          1  The process node is not set. Use the com...
+WARNING   IMPESI-3014         10  The RC network is incomplete for net %s....
+*** Message Summary: 21 warning(s), 0 error(s)
+
+#% End routeDesign (date=04/26 18:10:11, total cpu=3:47:23, real=3:47:05, peak res=6748.3M, current mem=4160.9M)
+Writing Netlist "/u/iwyse/Documents/ECE510/project/510Project/project/cadence/vec_mac_top_BF16/outputs/vec_mac_top_final.v" ...
+#% Begin save design ... (date=04/26 18:57:24, mem=4858.3M)
+% Begin Save ccopt configuration ... (date=04/26 18:57:24, mem=4858.3M)
+% End Save ccopt configuration ... (date=04/26 18:57:24, total cpu=0:00:00.0, real=0:00:00.0, peak res=4859.4M, current mem=4859.4M)
+% Begin Save netlist data ... (date=04/26 18:57:24, mem=4859.5M)
+Writing Binary DB to /u/iwyse/Documents/ECE510/project/510Project/project/cadence/vec_mac_top_BF16/outputs/vec_mac_top_final.enc.dat/vec_mac_top.v.bin in single-threaded mode...
+% End Save netlist data ... (date=04/26 18:57:25, total cpu=0:00:00.9, real=0:00:01.0, peak res=4859.5M, current mem=4859.5M)
+Saving symbol-table file ...
+Saving congestion map file /u/iwyse/Documents/ECE510/project/510Project/project/cadence/vec_mac_top_BF16/outputs/vec_mac_top_final.enc.dat/vec_mac_top.route.congmap.gz ...
+% Begin Save AAE data ... (date=04/26 18:57:28, mem=4868.9M)
+Saving AAE Data ...
+% End Save AAE data ... (date=04/26 18:57:28, total cpu=0:00:00.2, real=0:00:00.0, peak res=4868.9M, current mem=4867.8M)
+Saving preference file /u/iwyse/Documents/ECE510/project/510Project/project/cadence/vec_mac_top_BF16/outputs/vec_mac_top_final.enc.dat/gui.pref.tcl ...
+Saving mode setting ...
+Saving global file ...
+% Begin Save floorplan data ... (date=04/26 18:57:30, mem=4868.8M)
+Saving floorplan file ...
+Convert 0 swires and 0 svias from compressed groups
+% End Save floorplan data ... (date=04/26 18:57:35, total cpu=0:00:04.8, real=0:00:05.0, peak res=4869.2M, current mem=4869.2M)
+Saving Drc markers ...
+... 62 markers are saved ...
+... 62 geometry drc markers are saved ...
+... 0 antenna drc markers are saved ...
+% Begin Save placement data ... (date=04/26 18:57:36, mem=4869.2M)
+** Saving stdCellPlacement_binary (version# 2) ...
+Save Adaptive View Pruning View Names to Binary file
+% End Save placement data ... (date=04/26 18:57:36, total cpu=0:00:00.3, real=0:00:00.0, peak res=4869.3M, current mem=4869.3M)
+% Begin Save routing data ... (date=04/26 18:57:36, mem=4869.3M)
+Saving route file ...
+*** Completed saveRoute (cpu=0:00:13.8 real=0:00:14.0 mem=5231.6M) ***
+% End Save routing data ... (date=04/26 18:57:50, total cpu=0:00:13.9, real=0:00:15.0, peak res=4871.4M, current mem=4871.4M)
+Saving property file /u/iwyse/Documents/ECE510/project/510Project/project/cadence/vec_mac_top_BF16/outputs/vec_mac_top_final.enc.dat/vec_mac_top.prop
+*** Completed saveProperty (cpu=0:00:00.5 real=0:00:00.0 mem=5228.6M) ***
+#Saving pin access data to file /u/iwyse/Documents/ECE510/project/510Project/project/cadence/vec_mac_top_BF16/outputs/vec_mac_top_final.enc.dat/vec_mac_top.apa ...
+#
+% Begin Save power constraints data ... (date=04/26 18:57:54, mem=4871.9M)
+% End Save power constraints data ... (date=04/26 18:57:54, total cpu=0:00:00.1, real=0:00:00.0, peak res=4871.9M, current mem=4871.9M)
+Generated self-contained design vec_mac_top_final.enc.dat
+#% End save design ... (date=04/26 18:57:55, total cpu=0:00:26.6, real=0:00:31.0, peak res=4873.9M, current mem=4870.6M)
+*** Message Summary: 0 warning(s), 0 error(s)
+
+innovus 1> exit
+
+*** Memory Usage v#1 (Current mem = 5220.570M, initial mem = 390.141M) ***
+*** Message Summary: 168 warning(s), 2 error(s)
+
+--- Ending "Innovus" (totcpu=4:35:57, real=5:03:12, mem=5220.6M) ---
+
