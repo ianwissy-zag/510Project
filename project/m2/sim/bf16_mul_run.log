@@ -1,0 +1,10 @@
+=== BF16 multiplier testbench ===
+Test 1: Basic positive values
+Test 2: Sign combinations
+Test 3: Zero inputs
+Test 4: Values from MAC testbenches
+Test 5: 1000 random positive normal pairs vs C float
+  All 1000 random cases passed.
+Test 6: Overflow → infinity
+Test 7: Small values
+All bf16_mul tests PASSED.

@@ -1167,7 +1167,7 @@ int main() {
     for (int step = 0; step < max_steps; step++) {
 
         // once in a while estimate the validation loss
-        if (step % 10 == 0) {
+        if (step % 10 == 0 && max_steps > 1) {
             float val_loss = 0.0f;
             dataloader_reset(&val_loader);
             for (int i = 0; i < val_num_batches; i++) {

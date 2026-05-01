@@ -24,6 +24,7 @@ Source/llm/*.bin
 Source/llm_accel/train_gpt2
 Source/llm_accel/test_gpt2
 Source/llm_accel/weights_accel.bin
+Source/llm_accel/weights_verilator.bin
 
 # LLM — ignore compiled binaries and weight dumps
 Source/llm/train_gpt2

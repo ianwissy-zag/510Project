@@ -1,0 +1,9 @@
+=== AXI interface testbench ===
+Test 1: Weight to ping bank (tuser=00)
+Test 2: Weight to pong bank (tuser=01)
+Test 3: Activation to ping (tuser=10)
+Test 4: Activation to pong (tuser=11)
+Test 5: tuser locked to beat-0 value
+Test 6: No WE when tvalid=0
+All axi_interface tests PASSED.
+../tb/tb_interface.sv:181: $finish called at 666000 (1ps)

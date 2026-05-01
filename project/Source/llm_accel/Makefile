@@ -13,8 +13,27 @@ CFLAGS_COND = -march=native
 # make BACKEND=bf16          — Verilator + HDL_Vect_BF16 (custom BF16 FPU)
 BACKEND     ?= software
 SINGLE_PASS ?= 0
+ACCEL_PREC  ?= bf16_fp32
+
 ifeq ($(SINGLE_PASS), 1)
   CFLAGS += -DACCEL_SINGLE_PASS
+endif
+
+# ── Arithmetic precision mode (software backend only) ─────────────────────────
+# make ACCEL_PREC=bf16_fp32   BF16 multiply, FP32 accumulate (default, matches RTL)
+# make ACCEL_PREC=bf16_bf16   BF16 multiply, BF16 accumulate
+# make ACCEL_PREC=int16       INT16 multiply (per-tile quant), FP32 accumulate
+# make ACCEL_PREC=fp8         FP8 E4M3 multiply, FP32 accumulate
+ifeq ($(ACCEL_PREC), bf16_fp32)
+  CFLAGS += -DPREC_BF16_FP32
+else ifeq ($(ACCEL_PREC), bf16_bf16)
+  CFLAGS += -DPREC_BF16_BF16
+else ifeq ($(ACCEL_PREC), int16)
+  CFLAGS += -DPREC_INT16
+else ifeq ($(ACCEL_PREC), int8)
+  CFLAGS += -DPREC_INT8
+else ifeq ($(ACCEL_PREC), fp8)
+  CFLAGS += -DPREC_FP8_FP32
 endif
 
 # Paths to HDL directories (relative to this Makefile)
@@ -25,7 +44,8 @@ VFLAGS_LIB   = --cc -sv --Wno-fatal --Wno-WIDTH
 
 ifeq ($(BACKEND), software)
   ACCEL_SRC   = accel_hal_software.c
-  ACCEL_OBJ   = accel_hal_software.o
+  # Stamp object name with precision so changing ACCEL_PREC forces recompile
+  ACCEL_OBJ   = accel_hal_software_$(ACCEL_PREC).o
   ACCEL_FLAGS = -DACCEL_BACKEND_SOFTWARE
   ACCEL_LIBS  =
   ACCEL_INC   =
@@ -334,7 +354,7 @@ $(OBJ_LIB)/Vvec_mac_top__ALL.a:
 accel_hal_verilator.o: accel_hal_verilator.cpp accel_hal.h $(OBJ_LIB)/Vvec_mac_top__ALL.a
 	$(CXX) $(CXXFLAGS) $(ACCEL_FLAGS) -c $< -o $@
 
-accel_hal_software.o: accel_hal_software.c accel_hal.h
+accel_hal_software_$(ACCEL_PREC).o: accel_hal_software.c accel_hal.h
 	$(CC) $(CFLAGS) $(ACCEL_FLAGS) -c $< -o $@
 
 # ── Main targets ──────────────────────────────────────────────────────────────
@@ -373,7 +393,7 @@ profile_gpt2cu: profile_gpt2.cu $(NVCC_CUDNN)
 	$(NVCC) $(NVCC_FLAGS) $(PFLAGS) -lineinfo $^ $(NVCC_LDFLAGS) $(NVCC_INCLUDES) $(NVCC_LDLIBS)  $(CUDA_OUTPUT_FILE)
 
 clean:
-	$(REMOVE_FILES) $(TARGETS) accel_hal_software.o accel_hal_verilator.o
+	$(REMOVE_FILES) $(TARGETS) accel_hal_software_*.o accel_hal_verilator.o
 	$(REMOVE_BUILD_OBJECT_FILES)
 
 clean_verilator:

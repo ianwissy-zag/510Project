@@ -1,0 +1,11 @@
+=== Vec MAC top-level testbench (compute_core) ===
+BF16(1.0) = 0x3F80
+BF16(32.0)= 0x4200
+Test 1: all BF16(1.0) weights and activations (expect FP32 32.0 = 0x42000000)
+  done asserted
+Test 2: BF16(1.0) weights, BF16(1..32) acts (expect FP32 528.0 = 0x44040000)
+  done asserted
+Test 3: two-tile BF16 accumulation (expect FP32 64.0 = 0x42800000)
+  tile1 done
+  tile2 done
+All BF16 vec_mac_top tests PASSED.

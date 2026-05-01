@@ -110,7 +110,7 @@ module vec_mac_top #(
     // =========================================================
     // AXI input buffer
     // =========================================================
-    axis_to_vect_buffer #(
+    axi_interface #(
         .AXI_DATA_WIDTH(AXI_DATA_WIDTH),
         .TUSER_WIDTH   (TUSER_WIDTH),
         .VEC_SIZE      (VEC_SIZE),
@@ -213,7 +213,7 @@ module vec_mac_top #(
     // =========================================================
     // Vector MAC array
     // =========================================================
-    vec_mac_array #(
+    compute_core #(
         .VEC_SIZE  (VEC_SIZE),
         .ACT_WIDTH (ACT_WIDTH),
         .WT_WIDTH  (WT_WIDTH),
