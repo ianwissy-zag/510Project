@@ -1,9 +1,9 @@
 # =============================================================================
-# innovus.tcl — Cadence Innovus P&R script for vec_mac_top (512-wide BF16)
+# innovus.tcl — Cadence Innovus P&R script for sys_top (16×32 BF16 systolic)
 # Target PDK: ASAP7 predictive 7nm RVT
 #
 # Usage (run after genus.tcl completes):
-#   innovus -files innovus.tcl |& tee innovus.log
+#   innovus -no_gui -files innovus.tcl |& tee innovus.log
 #
 # Prerequisites:
 #   outputs/sys_top_netlist.v must exist (produced by genus.tcl)
@@ -15,21 +15,39 @@ set asap7_lef_dir $asap7_root/LEF
 set asap7_tef_dir $asap7_root/techlef_misc
 set asap7_lib_dir $asap7_root/LIB/NLDM
 
-# ── Initialise design ─────────────────────────────────────────────────────────
-# init_mmmc_file is the correct Innovus 21.x variable for timing setup.
-# mmmc.tcl defines library sets, delay corners, constraint modes and views.
+# ── Initialise design — legacy EDI-style global variables ─────────────────────
+# init_mmmc_file not available in Innovus 21.x; use init_* variables instead.
 set init_verilog    [list [file normalize outputs/sys_top_netlist.v]]
-set init_top_cell   vec_mac_top
+set init_top_cell   sys_top
 set init_lef_file   [list \
     $asap7_tef_dir/asap7_tech_1x_201209.lef \
     $asap7_lef_dir/asap7sc7p5t_28_R_1x_220121a.lef]
-set init_mmmc_file  [file normalize $script_dir/mmmc.tcl]
+
+# Setup corner: slow-slow
+set init_lib        [list \
+    $asap7_lib_dir/asap7sc7p5t_SIMPLE_RVT_SS_nldm_211120.lib \
+    $asap7_lib_dir/asap7sc7p5t_INVBUF_RVT_SS_nldm_220122.lib \
+    $asap7_lib_dir/asap7sc7p5t_SEQ_RVT_SS_nldm_220123.lib \
+    $asap7_lib_dir/asap7sc7p5t_AO_RVT_SS_nldm_211120.lib \
+    $asap7_lib_dir/asap7sc7p5t_OA_RVT_SS_nldm_211120.lib]
+
+# Hold corner: fast-fast
+set init_min_lib    [list \
+    $asap7_lib_dir/asap7sc7p5t_SIMPLE_RVT_FF_nldm_211120.lib \
+    $asap7_lib_dir/asap7sc7p5t_INVBUF_RVT_FF_nldm_220122.lib \
+    $asap7_lib_dir/asap7sc7p5t_SEQ_RVT_FF_nldm_220123.lib \
+    $asap7_lib_dir/asap7sc7p5t_AO_RVT_FF_nldm_211120.lib \
+    $asap7_lib_dir/asap7sc7p5t_OA_RVT_FF_nldm_211120.lib]
+
+set init_max_lib    $init_lib
+set init_sdcfile    [list [file normalize $script_dir/constraints_pnr.sdc]]
 
 init_design
 
 # ── Floorplan ─────────────────────────────────────────────────────────────────
-# ~3M cells (4× the 128-MAC design). 2000×2000 um at 45% utilisation.
-floorPlan -r 1.0 0.45 4.0 4.0 4.0 4.0
+# 512 MACs at ASAP7 density, similar cell count to the 128-wide BF16 design.
+# 1000×1000 um at 45% utilisation as starting point.
+floorPlan -r 1.0 0.45 2.0 2.0 2.0 2.0
 
 # ── Power distribution ────────────────────────────────────────────────────────
 addRing -nets {VDD VSS} \
@@ -48,13 +66,10 @@ sroute -nets {VDD VSS}
 # ── Placement ─────────────────────────────────────────────────────────────────
 place_design
 
-# Save checkpoint after placement so CTS/routing can resume without re-placing
 file mkdir outputs
-saveDesign outputs/vec_mac_top_placed.enc
+saveDesign outputs/sys_top_placed.enc
 
 # ── Clock tree synthesis ───────────────────────────────────────────────────────
-# Specify buffer and inverter cells for CTS — required when the tool cannot
-# automatically identify clock cells from the library.
 set_db cts_buffer_cells   {BUFx4_ASAP7_75t_R BUFx6f_ASAP7_75t_R BUFx12f_ASAP7_75t_R}
 set_db cts_inverter_cells {INVx1_ASAP7_75t_R INVx2_ASAP7_75t_R INVx4_ASAP7_75t_R}
 ccopt_design
@@ -70,7 +85,6 @@ report_area                                      > reports/area_final.rpt
 report_congestion                                > reports/congestion_final.rpt
 
 # ── Write outputs ─────────────────────────────────────────────────────────────
-file mkdir outputs
 saveNetlist    outputs/sys_top_final.v
-writeSDF       outputs/vec_mac_top.sdf
+writeSDF       outputs/sys_top.sdf
 saveDesign     outputs/sys_top_final.enc
