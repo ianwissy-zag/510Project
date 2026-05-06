@@ -1,0 +1,124 @@
+[05/04 15:19:24      0s] 
+[05/04 15:19:24      0s] Cadence Innovus(TM) Implementation System.
+[05/04 15:19:24      0s] Copyright 2024 Cadence Design Systems, Inc. All rights reserved worldwide.
+[05/04 15:19:24      0s] 
+[05/04 15:19:24      0s] Version:	v23.10-p003_1, built Thu Feb 1 13:54:57 PST 2024
+[05/04 15:19:24      0s] Options:	-no_gui -files innovus.tcl 
+[05/04 15:19:24      0s] Date:		Mon May  4 15:19:24 2026
+[05/04 15:19:24      0s] Host:		auto.ece.pdx.edu (x86_64 w/Linux 3.10.0-1160.119.1.el7.x86_64) (1core*32cpus*Intel Xeon Processor (Cascadelake) 16384KB)
+[05/04 15:19:24      0s] OS:		CentOS Linux 7 (Core)
+[05/04 15:19:24      0s] 
+[05/04 15:19:24      0s] License:
+[05/04 15:19:24      0s] 		[15:19:24.427953] Configured Lic search path (23.02-s003): 5280@cadence-lic.cecs.pdx.edu
+
+[05/04 15:19:24      0s] 		invs	Innovus Implementation System	23.1	checkout succeeded
+[05/04 15:19:24      0s] 		8 CPU jobs allowed with the current license(s). Use setMultiCpuUsage to set your required CPU count.
+[05/04 15:19:26      2s] {{{ isCertus 0,  isCertusOrDistOptClient = 0, isInnovusCertusClient = 0}}}
+[05/04 15:19:42     15s] Reset Parastics called with the command setExtractRCMode -reset@(#)CDS: Innovus v23.10-p003_1 (64bit) 02/01/2024 13:54 (Linux 3.10.0-693.el7.x86_64)
+[05/04 15:19:46     18s] @(#)CDS: NanoRoute 23.10-p003_1 NR240109-1512/23_10-UB (database version 18.20.618) {superthreading v2.20}
+[05/04 15:19:46     18s] @(#)CDS: AAE 23.10-p002 (64bit) 02/01/2024 (Linux 3.10.0-693.el7.x86_64)
+[05/04 15:19:46     18s] @(#)CDS: CTE 23.10-p003_1 () Dec  5 2023 19:42:23 ( )
+[05/04 15:19:46     18s] @(#)CDS: SYNTECH 23.10-p002_1 () Nov 29 2023 02:17:21 ( )
+[05/04 15:19:46     18s] @(#)CDS: CPE v23.10-p004
+[05/04 15:19:46     18s] @(#)CDS: IQuantus/TQuantus 22.1.1-s215 (64bit) Mon Nov 20 10:05:08 PST 2023 (Linux 3.10.0-693.el7.x86_64)
+[05/04 15:19:46     18s] @(#)CDS: OA 22.61-p007 Wed Sep 27 19:40:10 2023
+[05/04 15:19:46     18s] @(#)CDS: SGN 23.10-d005 (03-Oct-2023) (64 bit executable, TkQt5.15.9)
+[05/04 15:19:46     18s] @(#)CDS: RCDB 11.15.0
+[05/04 15:19:46     18s] @(#)CDS: STYLUS 23.10-a001_1 (12/04/2023 04:39 PST)
+[05/04 15:19:46     18s] @(#)CDS: IntegrityPlanner-23.10-12651 (23.10) (2023-09-06 08:32:42+0800)
+[05/04 15:19:46     18s] @(#)CDS: SYNTHESIS_ENGINE 23.10-b027
+[05/04 15:19:46     18s] Create and set the environment variable TMPDIR to /home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/vec_mac_top_512/innovus_temp_32756_auto.ece.pdx.edu_iwyse_1jkf3A.
+
+[05/04 15:19:46     18s] Change the soft stacksize limit to 0.2%RAM (245 mbytes). Set global soft_stack_size_limit to change the value.
+[05/04 15:19:48     20s] 
+[05/04 15:19:48     20s] **INFO:  MMMC transition support version v31-84 
+[05/04 15:19:48     20s] 
+[05/04 15:19:48     20s] <CMD> set_global _enable_mmmc_by_default_flow      $CTE::mmmc_default
+[05/04 15:19:48     20s] <CMD> suppressMessage ENCEXT-2799
+[05/04 15:19:48     20s] <CMD> getVersion
+[05/04 15:19:48     20s] <CMD> define_proc_arguments ViaFillQor -info {This procedure extracts Viafill details from innovus db} -define_args {
+        {-window "window coordinates" "" list optional}
+        {-window_size "window size in microns" "" string optional}
+    
+    }
+[05/04 15:19:49     20s] [INFO] Loading Pegasus 23.20 fill procedures
+[05/04 15:19:49     20s] **WARN: Tk package not loaded. The Pegasus fill DRC monitor is disabled.
+[05/04 15:19:50     21s] <CMD> define_proc_arguments ProcessFills -info {This procedure processes Fill types} -define_args {
+    {-fillInfo "Design Fill data" "" list required}
+				{-csvName "File path for Fill Data csv file" "Path of CSV file" string required}
+				{-selectFill "type of fill to be selected in session" "list of BRIDGE/EXTENSION/STAMP/FLOATING" list required}
+    {-output_data "Boolean Flag to output Fill Data for further processing" "" string required}
+}
+[05/04 15:19:50     21s] <CMD> define_proc_arguments FillQor -info {This procedure extracts fill details from innovus db} -define_args {
+    {-layers "Fills Cleanup on which all layers" "list of Metal/Routing layers" list optional}
+				{-selectFill "type of fill to be selected in session" "list of BRIDGE/EXTENSION/STAMP/FLOATING" list optional}
+				{-outData "Boolean Flag to output Fill Data for further processing" "" boolean optional}
+    {-outDataFile "File path for Fill Data csv file" "Path of CSV file" string optional}
+}
+[05/04 15:19:50     21s] <CMD> define_proc_arguments ProcessFills_fast -info {This procedure processes Fill types} -define_args {
+    {-fillInfo "Design Fill data" "" list required}
+				{-csvName "File path for Fill Data csv file" "Path of CSV file" string required}
+				{-selectFill "type of fill to be selected in session" "list of BRIDGE/EXTENSION/STAMP/FLOATING" list required}
+    {-output_data "Boolean Flag to output Fill Data for further processing" "" string required}
+}
+[05/04 15:19:50     21s] <CMD> define_proc_arguments FillQor_fast -info {This procedure extracts fill details from innovus db} -define_args {
+    {-layers "Fills Cleanup on which all layers" "list of Metal/Routing layers" list optional}
+				{-selectFill "type of fill to be selected in session" "list of BRIDGE/EXTENSION/STAMP/FLOATING" list optional}
+				{-outData "Boolean Flag to output Fill Data for further processing" "" boolean optional}
+    {-outDataFile "File path for Fill Data csv file" "Path of CSV file" string optional}
+}
+[05/04 15:19:50     21s] <CMD> define_proc_arguments ProcessFills_fast_stampOnly -info {This procedure processes Fill types} -define_args {
+    {-fillInfo "Design Fill data" "" list required}
+	
+}
+[05/04 15:19:50     21s] <CMD> define_proc_arguments FillQor_fast_stampOnly -info {This procedure extracts fill details from innovus db} -define_args {
+    {-layers "Fills Cleanup on which all layers" "list of Metal/Routing layers" list optional}
+}
+[05/04 15:19:50     21s] Sourcing file "innovus.tcl" ...
+[05/04 15:19:50     21s] <CMD> set init_verilog /home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/vec_mac_top_512/outputs/vec_mac_top_netlist.v
+[05/04 15:19:50     21s] <CMD> set init_top_cell vec_mac_top
+[05/04 15:19:50     21s] <CMD> set init_lef_file {/home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/asap7/asap7sc7p5t_28/techlef_misc/asap7_tech_1x_201209.lef /home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/asap7/asap7sc7p5t_28/LEF/asap7sc7p5t_28_R_1x_220121a.lef}
+[05/04 15:19:50     21s] <CMD> set init_mmmc_file /home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/vec_mac_top_512/mmmc.tcl
+[05/04 15:19:50     21s] <CMD> init_design
+[05/04 15:19:50     21s] #% Begin Load MMMC data ... (date=05/04 15:19:50, mem=1497.5M)
+[05/04 15:19:50     21s] **ERROR: (TCLCMD-995):	Can not open file '/home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/asap7/asap7sc7p5t_28/LIB/NLDM/asap7sc7p5t_SEQ_RVT_FF_nldm_220123.lib' for library set
+**ERROR: (TCLCMD-995):	Can not open file '/home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/asap7/asap7sc7p5t_28/LIB/NLDM/asap7sc7p5t_AO_RVT_FF_nldm_211120.lib' for library set
+**ERROR: (TCLCMD-995):	Can not open file '/home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/asap7/asap7sc7p5t_28/LIB/NLDM/asap7sc7p5t_OA_RVT_FF_nldm_211120.lib' for library set
+**ERROR: (IMPSYT-6692):	Invalid return code while executing 'innovus.tcl' was returned and script processing was stopped. Review the following error in 'innovus.tcl' then restart.
+[05/04 15:19:50     21s] Error info: innovus.tcl: 
+[05/04 15:19:50     21s]     while executing
+[05/04 15:19:50     21s] "error "$ret""
+[05/04 15:19:50     21s]     (procedure "::init_design::process_view_def" line 89)
+[05/04 15:19:50     21s]     invoked from within
+[05/04 15:19:50     21s] "::init_design::process_view_def $::init_mmmc_file"
+[05/04 15:19:50     21s]     (procedure "init_design" line 226)
+[05/04 15:19:50     21s]     invoked from within
+[05/04 15:19:50     21s] "init_design"
+[05/04 15:19:50     21s]     (file "innovus.tcl" line 28)
+[05/04 15:19:50     21s]     invoked from within
+[05/04 15:19:50     21s] "::se_source_orig innovus.tcl"
+[05/04 15:19:50     21s]     ("uplevel" body line 1)
+[05/04 15:19:50     21s]     invoked from within
+[05/04 15:19:50     21s] "uplevel [concat ::se_source_orig $args]"
+[05/04 15:19:50     21s]     (procedure "source" line 203)
+[05/04 15:19:50     21s]     invoked from within
+[05/04 15:19:50     21s] "source innovus.tcl"
+[05/04 15:19:50     21s]     ("uplevel" body line 1)
+[05/04 15:19:50     21s]     invoked from within
+[05/04 15:19:50     21s] "uplevel #0 source innovus.tcl"
+[05/04 15:19:50     21s]     ("eval" body line 1)
+[05/04 15:19:50     21s]     invoked from within
+[05/04 15:19:50     21s] "eval {uplevel #0 source innovus.tcl}"
+[05/04 15:19:50     21s]     (in namespace inscope "::" script line 1)
+[05/04 15:19:50     21s]     invoked from within
+[05/04 15:19:50     21s] "namespace inscope :: eval "uplevel #0 source $fileName"".
+[05/04 15:22:24     21s] 
+[05/04 15:22:24     21s] *** Memory Usage v#2 (Current mem = 1580.121M, initial mem = 812.664M) ***
+[05/04 15:22:24     21s] 
+[05/04 15:22:24     21s] *** Summary of all messages that are not suppressed in this session:
+[05/04 15:22:24     21s] Severity  ID               Count  Summary                                  
+[05/04 15:22:24     21s] ERROR     IMPSYT-6692          1  Invalid return code while executing '%s'...
+[05/04 15:22:24     21s] ERROR     TCLCMD-995           3  Can not open file '%s' for %s            
+[05/04 15:22:24     21s] *** Message Summary: 0 warning(s), 4 error(s)
+[05/04 15:22:24     21s] 
+[05/04 15:22:24     21s] --- Ending "Innovus" (totcpu=0:00:21.6, real=0:03:00, mem=1580.1M) ---

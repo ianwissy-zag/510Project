@@ -1,0 +1,62 @@
+
+Cadence Innovus(TM) Implementation System.
+Copyright 2024 Cadence Design Systems, Inc. All rights reserved worldwide.
+
+Version:	v23.10-p003_1, built Thu Feb 1 13:54:57 PST 2024
+Options:	-no_gui -files innovus.tcl 
+Date:		Mon May  4 15:19:24 2026
+Host:		auto.ece.pdx.edu (x86_64 w/Linux 3.10.0-1160.119.1.el7.x86_64) (1core*32cpus*Intel Xeon Processor (Cascadelake) 16384KB)
+OS:		CentOS Linux 7 (Core)
+
+License:
+		[15:19:24.427953] Configured Lic search path (23.02-s003): 5280@cadence-lic.cecs.pdx.edu
+
+		invs	Innovus Implementation System	23.1	checkout succeeded
+		8 CPU jobs allowed with the current license(s). Use setMultiCpuUsage to set your required CPU count.
+Create and set the environment variable TMPDIR to /home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/vec_mac_top_512/innovus_temp_32756_auto.ece.pdx.edu_iwyse_1jkf3A.
+
+Change the soft stacksize limit to 0.2%RAM (245 mbytes). Set global soft_stack_size_limit to change the value.
+
+**INFO:  MMMC transition support version v31-84 
+
+[INFO] Loading Pegasus 23.20 fill procedures
+**WARN: Tk package not loaded. The Pegasus fill DRC monitor is disabled.
+Sourcing file "innovus.tcl" ...
+#% Begin Load MMMC data ... (date=05/04 15:19:50, mem=1497.5M)
+**ERROR: (TCLCMD-995):	Can not open file '/home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/asap7/asap7sc7p5t_28/LIB/NLDM/asap7sc7p5t_SEQ_RVT_FF_nldm_220123.lib' for library set
+**ERROR: (TCLCMD-995):	Can not open file '/home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/asap7/asap7sc7p5t_28/LIB/NLDM/asap7sc7p5t_AO_RVT_FF_nldm_211120.lib' for library set
+**ERROR: (TCLCMD-995):	Can not open file '/home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/asap7/asap7sc7p5t_28/LIB/NLDM/asap7sc7p5t_OA_RVT_FF_nldm_211120.lib' for library set
+**ERROR: (IMPSYT-6692):	Invalid return code while executing 'innovus.tcl' was returned and script processing was stopped. Review the following error in 'innovus.tcl' then restart.
+Error info: innovus.tcl: 
+    while executing
+"error "$ret""
+    (procedure "::init_design::process_view_def" line 89)
+    invoked from within
+"::init_design::process_view_def $::init_mmmc_file"
+    (procedure "init_design" line 226)
+    invoked from within
+"init_design"
+    (file "innovus.tcl" line 28)
+    invoked from within
+"::se_source_orig innovus.tcl"
+    ("uplevel" body line 1)
+    invoked from within
+"uplevel [concat ::se_source_orig $args]"
+    (procedure "source" line 203)
+    invoked from within
+"source innovus.tcl"
+    ("uplevel" body line 1)
+    invoked from within
+"uplevel #0 source innovus.tcl"
+    ("eval" body line 1)
+    invoked from within
+"eval {uplevel #0 source innovus.tcl}"
+    (in namespace inscope "::" script line 1)
+    invoked from within
+"namespace inscope :: eval "uplevel #0 source $fileName"".
+innovus 1> exitE
+*** Memory Usage v#2 (Current mem = 1580.121M, initial mem = 812.664M) ***
+*** Message Summary: 0 warning(s), 4 error(s)
+
+--- Ending "Innovus" (totcpu=0:00:21.6, real=0:03:00, mem=1580.1M) ---
+E

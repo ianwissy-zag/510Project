@@ -1,0 +1,80 @@
+
+Cadence Innovus(TM) Implementation System.
+Copyright 2024 Cadence Design Systems, Inc. All rights reserved worldwide.
+
+Version:	v23.10-p003_1, built Thu Feb 1 13:54:57 PST 2024
+Options:	-no_gui -files innovus.tcl 
+Date:		Mon May  4 15:23:41 2026
+Host:		auto.ece.pdx.edu (x86_64 w/Linux 3.10.0-1160.119.1.el7.x86_64) (1core*32cpus*Intel Xeon Processor (Cascadelake) 16384KB)
+OS:		CentOS Linux 7 (Core)
+
+License:
+		[15:23:41.427905] Configured Lic search path (23.02-s003): 5280@cadence-lic.cecs.pdx.edu
+
+		invs	Innovus Implementation System	23.1	checkout succeeded
+		8 CPU jobs allowed with the current license(s). Use setMultiCpuUsage to set your required CPU count.
+Create and set the environment variable TMPDIR to /home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/systolic_16x32/innovus_temp_946_auto.ece.pdx.edu_iwyse_kJa4vh.
+
+Change the soft stacksize limit to 0.2%RAM (245 mbytes). Set global soft_stack_size_limit to change the value.
+
+**INFO:  MMMC transition support version v31-84 
+
+[INFO] Loading Pegasus 23.20 fill procedures
+**WARN: Tk package not loaded. The Pegasus fill DRC monitor is disabled.
+Sourcing file "innovus.tcl" ...
+
+Loading LEF file /home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/asap7/asap7sc7p5t_28/techlef_misc/asap7_tech_1x_201209.lef ...
+
+Loading LEF file /home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/asap7/asap7sc7p5t_28/LEF/asap7sc7p5t_28_R_1x_220121a.lef ...
+**WARN: (IMPLF-108):	There is no overlap layer defined in any LEF file
+so you are unable to create rectilinear partition in a hierarchical flow.
+Set DBUPerIGU to M1 pitch 36.
+[15:24:07.195137] Periodic Lic check successful
+[15:24:07.719504] Feature usage summary:
+[15:24:07.719506] Innovus_Impl_System
+[15:24:07.719514] Innovus_7nm_Opt
+
+This command "init_design" required an extra checkout of license invs_7nm.
+Additional license(s) checked out: 1 'Innovus_7nm_Opt' license(s)
+
+##  Check design process and node:  
+##  Both design process and tech node are not set.
+
+*** End library_loading (cpu=0.00min, real=0.00min, mem=0.0M, fe_cpu=0.36min, fe_real=0.43min, fe_mem=1584.3M) ***
+**ERROR: (IMPSYT-16038):	The specified file '/home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/systolic_16x32/outputs/sys_top_netlist.v' could not be found. Check your file system, correct the file name.
+**ERROR: (IMPIMEX-7008):	No netlist files are found.
+**ERROR: (IMPSYT-6692):	Invalid return code while executing 'innovus.tcl' was returned and script processing was stopped. Review the following error in 'innovus.tcl' then restart.
+Error info: innovus.tcl: 
+    while executing
+"error $msg"
+    (procedure "apply_design" line 34)
+    invoked from within
+"apply_design $loadViewDefinition"
+    (procedure "init_design" line 422)
+    invoked from within
+"init_design"
+    (file "innovus.tcl" line 45)
+    invoked from within
+"::se_source_orig innovus.tcl"
+    ("uplevel" body line 1)
+    invoked from within
+"uplevel [concat ::se_source_orig $args]"
+    (procedure "source" line 203)
+    invoked from within
+"source innovus.tcl"
+    ("uplevel" body line 1)
+    invoked from within
+"uplevel #0 source innovus.tcl"
+    ("eval" body line 1)
+    invoked from within
+"eval {uplevel #0 source innovus.tcl}"
+    (in namespace inscope "::" script line 1)
+    invoked from within
+"namespace inscope :: eval "uplevel #0 source $fileName"".
+innovus 1> exit
+
+*** Memory Usage v#2 (Current mem = 1585.262M, initial mem = 812.664M) ***
+*** Message Summary: 1 warning(s), 3 error(s)
+
+--- Ending "Innovus" (totcpu=0:00:22.2, real=0:04:58, mem=1585.3M) ---
+

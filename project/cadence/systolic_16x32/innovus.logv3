@@ -1,0 +1,142 @@
+[05/04 15:23:41      0s] 
+[05/04 15:23:41      0s] Cadence Innovus(TM) Implementation System.
+[05/04 15:23:41      0s] Copyright 2024 Cadence Design Systems, Inc. All rights reserved worldwide.
+[05/04 15:23:41      0s] 
+[05/04 15:23:41      0s] Version:	v23.10-p003_1, built Thu Feb 1 13:54:57 PST 2024
+[05/04 15:23:41      0s] Options:	-no_gui -files innovus.tcl 
+[05/04 15:23:41      0s] Date:		Mon May  4 15:23:41 2026
+[05/04 15:23:41      0s] Host:		auto.ece.pdx.edu (x86_64 w/Linux 3.10.0-1160.119.1.el7.x86_64) (1core*32cpus*Intel Xeon Processor (Cascadelake) 16384KB)
+[05/04 15:23:41      0s] OS:		CentOS Linux 7 (Core)
+[05/04 15:23:41      0s] 
+[05/04 15:23:41      0s] License:
+[05/04 15:23:41      0s] 		[15:23:41.427905] Configured Lic search path (23.02-s003): 5280@cadence-lic.cecs.pdx.edu
+
+[05/04 15:23:41      1s] 		invs	Innovus Implementation System	23.1	checkout succeeded
+[05/04 15:23:41      1s] 		8 CPU jobs allowed with the current license(s). Use setMultiCpuUsage to set your required CPU count.
+[05/04 15:23:43      2s] {{{ isCertus 0,  isCertusOrDistOptClient = 0, isInnovusCertusClient = 0}}}
+[05/04 15:23:59     15s] Reset Parastics called with the command setExtractRCMode -reset@(#)CDS: Innovus v23.10-p003_1 (64bit) 02/01/2024 13:54 (Linux 3.10.0-693.el7.x86_64)
+[05/04 15:24:03     18s] @(#)CDS: NanoRoute 23.10-p003_1 NR240109-1512/23_10-UB (database version 18.20.618) {superthreading v2.20}
+[05/04 15:24:03     18s] @(#)CDS: AAE 23.10-p002 (64bit) 02/01/2024 (Linux 3.10.0-693.el7.x86_64)
+[05/04 15:24:03     18s] @(#)CDS: CTE 23.10-p003_1 () Dec  5 2023 19:42:23 ( )
+[05/04 15:24:03     18s] @(#)CDS: SYNTECH 23.10-p002_1 () Nov 29 2023 02:17:21 ( )
+[05/04 15:24:03     18s] @(#)CDS: CPE v23.10-p004
+[05/04 15:24:03     18s] @(#)CDS: IQuantus/TQuantus 22.1.1-s215 (64bit) Mon Nov 20 10:05:08 PST 2023 (Linux 3.10.0-693.el7.x86_64)
+[05/04 15:24:03     18s] @(#)CDS: OA 22.61-p007 Wed Sep 27 19:40:10 2023
+[05/04 15:24:03     18s] @(#)CDS: SGN 23.10-d005 (03-Oct-2023) (64 bit executable, TkQt5.15.9)
+[05/04 15:24:03     18s] @(#)CDS: RCDB 11.15.0
+[05/04 15:24:03     18s] @(#)CDS: STYLUS 23.10-a001_1 (12/04/2023 04:39 PST)
+[05/04 15:24:03     18s] @(#)CDS: IntegrityPlanner-23.10-12651 (23.10) (2023-09-06 08:32:42+0800)
+[05/04 15:24:03     18s] @(#)CDS: SYNTHESIS_ENGINE 23.10-b027
+[05/04 15:24:03     18s] Create and set the environment variable TMPDIR to /home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/systolic_16x32/innovus_temp_946_auto.ece.pdx.edu_iwyse_kJa4vh.
+
+[05/04 15:24:03     18s] Change the soft stacksize limit to 0.2%RAM (245 mbytes). Set global soft_stack_size_limit to change the value.
+[05/04 15:24:05     20s] 
+[05/04 15:24:05     20s] **INFO:  MMMC transition support version v31-84 
+[05/04 15:24:05     20s] 
+[05/04 15:24:05     20s] <CMD> set_global _enable_mmmc_by_default_flow      $CTE::mmmc_default
+[05/04 15:24:05     20s] <CMD> suppressMessage ENCEXT-2799
+[05/04 15:24:05     20s] <CMD> getVersion
+[05/04 15:24:06     20s] <CMD> define_proc_arguments ViaFillQor -info {This procedure extracts Viafill details from innovus db} -define_args {
+        {-window "window coordinates" "" list optional}
+        {-window_size "window size in microns" "" string optional}
+    
+    }
+[05/04 15:24:06     21s] [INFO] Loading Pegasus 23.20 fill procedures
+[05/04 15:24:07     21s] **WARN: Tk package not loaded. The Pegasus fill DRC monitor is disabled.
+[05/04 15:24:07     21s] <CMD> define_proc_arguments ProcessFills -info {This procedure processes Fill types} -define_args {
+    {-fillInfo "Design Fill data" "" list required}
+				{-csvName "File path for Fill Data csv file" "Path of CSV file" string required}
+				{-selectFill "type of fill to be selected in session" "list of BRIDGE/EXTENSION/STAMP/FLOATING" list required}
+    {-output_data "Boolean Flag to output Fill Data for further processing" "" string required}
+}
+[05/04 15:24:07     21s] <CMD> define_proc_arguments FillQor -info {This procedure extracts fill details from innovus db} -define_args {
+    {-layers "Fills Cleanup on which all layers" "list of Metal/Routing layers" list optional}
+				{-selectFill "type of fill to be selected in session" "list of BRIDGE/EXTENSION/STAMP/FLOATING" list optional}
+				{-outData "Boolean Flag to output Fill Data for further processing" "" boolean optional}
+    {-outDataFile "File path for Fill Data csv file" "Path of CSV file" string optional}
+}
+[05/04 15:24:07     21s] <CMD> define_proc_arguments ProcessFills_fast -info {This procedure processes Fill types} -define_args {
+    {-fillInfo "Design Fill data" "" list required}
+				{-csvName "File path for Fill Data csv file" "Path of CSV file" string required}
+				{-selectFill "type of fill to be selected in session" "list of BRIDGE/EXTENSION/STAMP/FLOATING" list required}
+    {-output_data "Boolean Flag to output Fill Data for further processing" "" string required}
+}
+[05/04 15:24:07     21s] <CMD> define_proc_arguments FillQor_fast -info {This procedure extracts fill details from innovus db} -define_args {
+    {-layers "Fills Cleanup on which all layers" "list of Metal/Routing layers" list optional}
+				{-selectFill "type of fill to be selected in session" "list of BRIDGE/EXTENSION/STAMP/FLOATING" list optional}
+				{-outData "Boolean Flag to output Fill Data for further processing" "" boolean optional}
+    {-outDataFile "File path for Fill Data csv file" "Path of CSV file" string optional}
+}
+[05/04 15:24:07     21s] <CMD> define_proc_arguments ProcessFills_fast_stampOnly -info {This procedure processes Fill types} -define_args {
+    {-fillInfo "Design Fill data" "" list required}
+	
+}
+[05/04 15:24:07     21s] <CMD> define_proc_arguments FillQor_fast_stampOnly -info {This procedure extracts fill details from innovus db} -define_args {
+    {-layers "Fills Cleanup on which all layers" "list of Metal/Routing layers" list optional}
+}
+[05/04 15:24:07     21s] Sourcing file "innovus.tcl" ...
+[05/04 15:24:07     21s] <CMD> set init_verilog /home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/systolic_16x32/outputs/sys_top_netlist.v
+[05/04 15:24:07     21s] <CMD> set init_top_cell sys_top
+[05/04 15:24:07     21s] <CMD> set init_lef_file {/home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/asap7/asap7sc7p5t_28/techlef_misc/asap7_tech_1x_201209.lef /home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/asap7/asap7sc7p5t_28/LEF/asap7sc7p5t_28_R_1x_220121a.lef}
+[05/04 15:24:07     21s] <CMD> init_design
+[05/04 15:24:07     21s] 
+[05/04 15:24:07     21s] Loading LEF file /home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/asap7/asap7sc7p5t_28/techlef_misc/asap7_tech_1x_201209.lef ...
+[05/04 15:24:07     21s] 
+[05/04 15:24:07     21s] Loading LEF file /home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/asap7/asap7sc7p5t_28/LEF/asap7sc7p5t_28_R_1x_220121a.lef ...
+[05/04 15:24:07     21s] **WARN: (IMPLF-108):	There is no overlap layer defined in any LEF file
+[05/04 15:24:07     21s] so you are unable to create rectilinear partition in a hierarchical flow.
+[05/04 15:24:07     21s] Set DBUPerIGU to M1 pitch 36.
+[05/04 15:24:07     21s] [15:24:07.195137] Periodic Lic check successful
+[15:24:07.719504] Feature usage summary:
+[15:24:07.719506] Innovus_Impl_System
+[15:24:07.719514] Innovus_7nm_Opt
+
+[05/04 15:24:07     21s] This command "init_design" required an extra checkout of license invs_7nm.
+[05/04 15:24:07     21s] Additional license(s) checked out: 1 'Innovus_7nm_Opt' license(s)
+[05/04 15:24:07     21s] 
+##  Check design process and node:  
+##  Both design process and tech node are not set.
+
+[05/04 15:24:07     21s] *** End library_loading (cpu=0.00min, real=0.00min, mem=0.0M, fe_cpu=0.36min, fe_real=0.43min, fe_mem=1584.3M) ***
+[05/04 15:24:07     21s] **ERROR: (IMPSYT-16038):	The specified file '/home/iwyse/common/Documents/ECE510/project/510Project/project/cadence/systolic_16x32/outputs/sys_top_netlist.v' could not be found. Check your file system, correct the file name.
+[05/04 15:24:07     21s] **ERROR: (IMPIMEX-7008):	No netlist files are found.
+[05/04 15:24:07     21s] **ERROR: (IMPSYT-6692):	Invalid return code while executing 'innovus.tcl' was returned and script processing was stopped. Review the following error in 'innovus.tcl' then restart.
+[05/04 15:24:07     21s] Error info: innovus.tcl: 
+[05/04 15:24:07     21s]     while executing
+[05/04 15:24:07     21s] "error $msg"
+[05/04 15:24:07     21s]     (procedure "apply_design" line 34)
+[05/04 15:24:07     21s]     invoked from within
+[05/04 15:24:07     21s] "apply_design $loadViewDefinition"
+[05/04 15:24:07     21s]     (procedure "init_design" line 422)
+[05/04 15:24:07     21s]     invoked from within
+[05/04 15:24:07     21s] "init_design"
+[05/04 15:24:07     21s]     (file "innovus.tcl" line 45)
+[05/04 15:24:07     21s]     invoked from within
+[05/04 15:24:07     21s] "::se_source_orig innovus.tcl"
+[05/04 15:24:07     21s]     ("uplevel" body line 1)
+[05/04 15:24:07     21s]     invoked from within
+[05/04 15:24:07     21s] "uplevel [concat ::se_source_orig $args]"
+[05/04 15:24:07     21s]     (procedure "source" line 203)
+[05/04 15:24:07     21s]     invoked from within
+[05/04 15:24:07     21s] "source innovus.tcl"
+[05/04 15:24:07     21s]     ("uplevel" body line 1)
+[05/04 15:24:07     21s]     invoked from within
+[05/04 15:24:07     21s] "uplevel #0 source innovus.tcl"
+[05/04 15:24:07     21s]     ("eval" body line 1)
+[05/04 15:24:07     21s]     invoked from within
+[05/04 15:24:07     21s] "eval {uplevel #0 source innovus.tcl}"
+[05/04 15:24:07     21s]     (in namespace inscope "::" script line 1)
+[05/04 15:24:07     21s]     invoked from within
+[05/04 15:24:07     21s] "namespace inscope :: eval "uplevel #0 source $fileName"".
+[05/04 15:28:39     22s] 
+[05/04 15:28:39     22s] *** Memory Usage v#2 (Current mem = 1585.262M, initial mem = 812.664M) ***
+[05/04 15:28:39     22s] 
+[05/04 15:28:39     22s] *** Summary of all messages that are not suppressed in this session:
+[05/04 15:28:39     22s] Severity  ID               Count  Summary                                  
+[05/04 15:28:39     22s] WARNING   IMPLF-108            1  There is no overlap layer defined in any...
+[05/04 15:28:39     22s] ERROR     IMPSYT-6692          1  Invalid return code while executing '%s'...
+[05/04 15:28:39     22s] ERROR     IMPSYT-16038         1  The specified file '%s' could not be fou...
+[05/04 15:28:39     22s] ERROR     IMPIMEX-7008         1  No netlist files are found.              
+[05/04 15:28:39     22s] *** Message Summary: 1 warning(s), 3 error(s)
+[05/04 15:28:39     22s] 
+[05/04 15:28:39     22s] --- Ending "Innovus" (totcpu=0:00:22.2, real=0:04:58, mem=1585.3M) ---
