@@ -85,6 +85,8 @@ int main(int argc, char *argv[]) {
     // overall OK signal for the test
     int allok = 1;
 
+    accel_hal_init();
+
     // let's do 10 training iterations, following the pytorch code
     float expected_losses[10] = {
         5.270007133483887f,
@@ -185,6 +187,7 @@ int main(int argc, char *argv[]) {
     printf("overall okay: %d\n", allok);
 
     // free everything
+    accel_hal_free();
     free(x);
     free(y);
     free(expected_logits);

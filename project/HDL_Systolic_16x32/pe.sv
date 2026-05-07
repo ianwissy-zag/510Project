@@ -33,6 +33,9 @@ module pe (
     logic [15:0] weight_reg;
     logic [31:0] mac_result;
 
+    // w_out is combinational so the shift chain needs only ROWS cycles, not 2×ROWS.
+    assign w_out = weight_reg;
+
     bf16_mac_unit u_mac (
         .act_bf16    (a_in),
         .wt_bf16     (weight_reg),
@@ -44,11 +47,9 @@ module pe (
         if (!rst_n) begin
             weight_reg <= '0;
             a_out      <= '0;
-            w_out      <= '0;
             psum_out   <= '0;
         end else if (load_wt) begin
             weight_reg <= w_in;
-            w_out      <= weight_reg;   // shift chain: old value passes down
         end else begin
             a_out    <= a_in;
             psum_out <= mac_result;

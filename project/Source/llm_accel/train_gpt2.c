@@ -162,38 +162,48 @@ void layernorm_backward(float* dinp, float* dweight, float* dbias,
     }
 }
 
-// ── Accelerator tiling engine ─────────────────────────────────────────────────
+// ── Accelerator parameters (switched at compile time) ─────────────────────────
+// Systolic backends use SYS_COLS/SYS_ROWS; vector backends use VEC_SIZE/K_DEPTH.
+#if defined(ACCEL_BACKEND_SYSTOLIC) || defined(ACCEL_BACKEND_SYSTOLIC_VRL)
+#  define TILE_N  ACCEL_SYS_COLS   // 32
+#  define TILE_K  ACCEL_SYS_ROWS   // 16
+#else
+#  define TILE_N  ACCEL_VEC_SIZE   // 128
+#  define TILE_K  ACCEL_K_DEPTH    // 32
+#endif
+
+// ── Forward tiling engine ─────────────────────────────────────────────────────
 // out (M x N) = inp (M x K) * weight^T (N x K)
-// Tiles N in ACCEL_VEC_SIZE chunks, K in ACCEL_K_DEPTH chunks.
+// Tiles N in TILE_N chunks, K in TILE_K chunks.
 // Remainder columns/rows handled on CPU.
 static void accel_matmul(float* out, const float* inp, const float* weight,
                           int M, int K, int N) {
-    bf16_t w_tile[ACCEL_K_DEPTH * ACCEL_VEC_SIZE];
-    bf16_t act_tile[ACCEL_K_DEPTH];
-    float  result_tile[ACCEL_VEC_SIZE];
+    bf16_t w_tile[TILE_K * TILE_N];
+    bf16_t act_tile[TILE_K];
+    float  result_tile[TILE_N];
 
-    int N_tiles = N / ACCEL_VEC_SIZE;
-    int N_rem   = N % ACCEL_VEC_SIZE;
-    int K_tiles = K / ACCEL_K_DEPTH;
-    int K_rem   = K % ACCEL_K_DEPTH;
+    int N_tiles = N / TILE_N;
+    int N_rem   = N % TILE_N;
+    int K_tiles = K / TILE_K;
+    int K_rem   = K % TILE_K;
 
     // ── Accelerator handles full N and K tiles ────────────────────────────────
     for (int nt = 0; nt < N_tiles; nt++) {
-        int n_base = nt * ACCEL_VEC_SIZE;
+        int n_base = nt * TILE_N;
 
         for (int m = 0; m < M; m++) {
             for (int kt = 0; kt < K_tiles; kt++) {
-                int k_base  = kt * ACCEL_K_DEPTH;
+                int k_base  = kt * TILE_K;
                 int first_k = (kt == 0);
 
                 // Pack weight tile: rows=K_DEPTH, cols=VEC_SIZE
-                for (int k = 0; k < ACCEL_K_DEPTH; k++)
-                    for (int n = 0; n < ACCEL_VEC_SIZE; n++)
-                        w_tile[k * ACCEL_VEC_SIZE + n] =
+                for (int k = 0; k < TILE_K; k++)
+                    for (int n = 0; n < TILE_N; n++)
+                        w_tile[k * TILE_N + n] =
                             float_to_bf16(weight[(n_base + n) * K + k_base + k]);
 
                 // Pack activation tile
-                for (int k = 0; k < ACCEL_K_DEPTH; k++)
+                for (int k = 0; k < TILE_K; k++)
                     act_tile[k] = float_to_bf16(inp[m * K + k_base + k]);
 
                 hal_compute_tile(w_tile, act_tile, first_k);
@@ -210,11 +220,11 @@ static void accel_matmul(float* out, const float* inp, const float* weight,
                 int k_base = K_tiles * ACCEL_K_DEPTH;
                 for (int k = 0; k < K_rem; k++) {
                     float a = inp[m * K + k_base + k];
-                    for (int n = 0; n < ACCEL_VEC_SIZE; n++)
+                    for (int n = 0; n < TILE_N; n++)
                         result_tile[n] += a * weight[(n_base + n) * K + k_base + k];
                 }
             }
-            for (int n = 0; n < ACCEL_VEC_SIZE; n++)
+            for (int n = 0; n < TILE_N; n++)
                 out[m * N + n_base + n] = result_tile[n];
         }
     }
@@ -257,6 +267,69 @@ void matmul_forward_naive(float* out,
     }
 }
 
+// ── Backward dinp tiling engine (systolic backends) ──────────────────────────
+// dinp (M x K) = dout (M x N) * weight (N x K)
+// Tiles K in TILE_N chunks, N in TILE_K chunks.
+// The transposed weight W^T must have been pre-loaded into the backward SRAM.
+// Non-systolic backends fall back to the CPU implementation.
+#if defined(ACCEL_BACKEND_SYSTOLIC) || defined(ACCEL_BACKEND_SYSTOLIC_VRL)
+static void accel_matmul_backward_dinp(float* dinp, const float* dout,
+                                        const float* weight, int M, int K, int N) {
+    // dinp[m][k] = sum_n( dout[m][n] * weight[n][k] )
+    // Treat as: dinp = dout x weight  (shape M×N times N×K = M×K)
+    // Remap: "output" dim = K (tiles of TILE_N), "inner" dim = N (tiles of TILE_K)
+    bf16_t wT_tile[TILE_K * TILE_N];  // transposed weight tile [n][k]
+    bf16_t dout_tile[TILE_K];         // gradient tile along N
+    float  result_tile[TILE_N];
+
+    int K_tiles = K / TILE_N;
+    int K_rem   = K % TILE_N;
+    int N_tiles = N / TILE_K;
+    int N_rem   = N % TILE_K;
+
+    for (int kt = 0; kt < K_tiles; kt++) {
+        int k_base = kt * TILE_N;
+        for (int m = 0; m < M; m++) {
+            for (int nt = 0; nt < N_tiles; nt++) {
+                int n_base  = nt * TILE_K;
+                int first_n = (nt == 0);
+                // Pack wT_tile[n][k] = weight[n_base+n][k_base+k]
+                for (int n = 0; n < TILE_K; n++)
+                    for (int k = 0; k < TILE_N; k++)
+                        wT_tile[n * TILE_N + k] =
+                            float_to_bf16(weight[(n_base+n)*K + k_base+k]);
+                for (int n = 0; n < TILE_K; n++)
+                    dout_tile[n] = float_to_bf16(dout[m*N + n_base+n]);
+                hal_compute_tile_bwd(wT_tile, dout_tile, first_n);
+            }
+            if (N_tiles > 0) hal_read_results(result_tile);
+            else              memset(result_tile, 0, sizeof(result_tile));
+            // N remainder on CPU
+            if (N_rem > 0) {
+                int n_base = N_tiles * TILE_K;
+                for (int n = 0; n < N_rem; n++) {
+                    float d = dout[m*N + n_base + n];
+                    for (int k = 0; k < TILE_N; k++)
+                        result_tile[k] += d * weight[(n_base+n)*K + k_base+k];
+                }
+            }
+            for (int k = 0; k < TILE_N; k++)
+                dinp[m*K + k_base+k] += result_tile[k];
+        }
+    }
+    // K remainder on CPU
+    if (K_rem > 0) {
+        int k_base = K_tiles * TILE_N;
+        for (int m = 0; m < M; m++)
+            for (int n = 0; n < N; n++) {
+                float d = dout[m*N + n];
+                for (int k = 0; k < K_rem; k++)
+                    dinp[m*K + k_base+k] += d * weight[n*K + k_base+k];
+            }
+    }
+}
+#endif
+
 void matmul_forward(float* out,
                     const float* inp, const float* weight, const float* bias,
                     int B, int T, int C, int OC) {
@@ -280,7 +353,11 @@ void matmul_backward(float* dinp, float* dweight, float* dbias,
     // this backward could be done in a single "round" of loops
     // but that doesn't afford an efficient parallelization strategy
 
-    // backward into inp first, parallelize over B,T
+    // backward into inp: dinp = dout x weight  (M×OC times OC×C = M×C)
+#if defined(ACCEL_BACKEND_SYSTOLIC) || defined(ACCEL_BACKEND_SYSTOLIC_VRL)
+    // Accelerated dinp via backward weight SRAM
+    accel_matmul_backward_dinp(dinp, dout, weight, B*T, C, OC);
+#else
     #pragma omp parallel for collapse(2)
     for (int b = 0; b < B; b++) {
         for (int t = 0; t < T; t++) {
@@ -295,6 +372,7 @@ void matmul_backward(float* dinp, float* dweight, float* dbias,
             }
         }
     }
+#endif
     // backward into weight/bias, parallelize over output channels OC
     #pragma omp parallel for
     for (int o = 0; o < OC; o++) {

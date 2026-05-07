@@ -7,8 +7,7 @@
 //
 // State machine: IDLE → LOAD_WT → COMPUTE → CAPTURE → DONE
 //
-//   LOAD_WT (2×ROWS = 32 cycles): each PE has a 2-register shift chain
-//     (weight_reg + w_out), so 2×ROWS cycles are needed to fill all rows.
+//   LOAD_WT (ROWS = 16 cycles): w_out is combinational so one cycle per row suffices.
 //   COMPUTE (ROWS = 16 cycles): broadcast act_in, psum propagates downward.
 //   CAPTURE: stores psum_out into accumulator or output SRAM.
 //   DONE: pulses done for one cycle.
@@ -71,7 +70,7 @@ module controller #(
     } state_t;
 
     state_t state;
-    logic [$clog2(ROWS)+1:0] counter;  // LOAD_WT needs up to 2×ROWS-1 = 31
+    logic [ADDR_WIDTH-1:0] counter;  // LOAD_WT and COMPUTE both need up to ROWS-1 = 15
 
     // Accumulator register (FP32, one per column)
     logic [COLS-1:0][PSUM_WIDTH-1:0] accum_reg;
@@ -112,13 +111,11 @@ module controller #(
         end
     endgenerate
 
-    // Weight SRAM address and read enables
-    // Each SRAM row is presented for 2 consecutive LOAD_WT cycles so both
-    // registers in the 2-deep shift chain (weight_reg + w_out) advance correctly.
-    assign fwd_wt_addr_0 = counter[ADDR_WIDTH:1];   // counter >> 1
-    assign fwd_wt_addr_1 = counter[ADDR_WIDTH:1];
-    assign bwd_wt_addr_0 = counter[ADDR_WIDTH:1];
-    assign bwd_wt_addr_1 = counter[ADDR_WIDTH:1];
+    // Weight SRAM address: one row per cycle, direct counter mapping.
+    assign fwd_wt_addr_0 = counter;
+    assign fwd_wt_addr_1 = counter;
+    assign bwd_wt_addr_0 = counter;
+    assign bwd_wt_addr_1 = counter;
 
     logic in_load;
     assign in_load = (state == LOAD_WT);
@@ -159,8 +156,7 @@ module controller #(
                 end
 
                 LOAD_WT: begin
-                    // 2×ROWS cycles — 2-register shift chain needs 2 cycles per row
-                    if (counter == ($clog2(ROWS)+1)'(2*ROWS - 1)) begin
+                    if (counter == ADDR_WIDTH'(ROWS - 1)) begin
                         state   <= COMPUTE;
                         counter <= '0;
                     end else

@@ -84,8 +84,35 @@ else ifeq ($(BACKEND), bf16)
                 $(HDL_DIR)/bf16_mac_dpi.c
   ACCEL_INC   = -I$(OBJ_LIB)
   LINK_CXX    = 1
+else ifeq ($(BACKEND), systolic)
+  # Pure-C simulation of the 16×32 systolic (forward + backward dinp)
+  ACCEL_SRC   = accel_hal_software.c
+  ACCEL_OBJ   = accel_hal_systolic_sw_$(ACCEL_PREC).o
+  ACCEL_FLAGS = -DACCEL_BACKEND_SYSTOLIC -DACCEL_SINGLE_PASS
+  ACCEL_LIBS  =
+  ACCEL_INC   =
+  LINK_CXX    = 0
+else ifeq ($(BACKEND), systolic_vrl)
+  # Verilator cycle-accurate simulation of HDL_Systolic_16x32
+  HDL_DIR     = ../../HDL_Systolic_16x32
+  HDL_SRCS    = top.sv axi.sv systolic_16x32.sv pe.sv \
+                bf16_mac_unit.sv bf16_mul.sv bf16_fp32_add.sv \
+                weight_sram.sv act_sram.sv output_sram.sv \
+                controller.sv axi_readback.sv
+  OBJ_LIB     = $(HDL_DIR)/obj_lib
+  ACCEL_SRC   = accel_hal_systolic_vrl.cpp
+  ACCEL_OBJ   = accel_hal_systolic_vrl.o
+  VERILATOR_INC = $(shell $(VERILATOR) --getenv VERILATOR_ROOT)/include
+  ACCEL_FLAGS = -DACCEL_BACKEND_SYSTOLIC_VRL -DACCEL_SINGLE_PASS \
+                -I$(OBJ_LIB) -I$(VERILATOR_INC) -I$(VERILATOR_INC)/vltstd
+  ACCEL_LIBS  = $(OBJ_LIB)/Vsys_top__ALL.a \
+                $(VERILATOR_INC)/verilated.cpp \
+                $(VERILATOR_INC)/verilated_threads.cpp \
+                $(HDL_DIR)/bf16_mac_dpi.c
+  ACCEL_INC   = -I$(OBJ_LIB)
+  LINK_CXX    = 1
 else
-  $(error Unknown BACKEND=$(BACKEND). Choose: software vect128 bf16)
+  $(error Unknown BACKEND=$(BACKEND). Choose: software vect128 bf16 systolic systolic_vrl)
 endif
 
 # Find nvcc
@@ -344,15 +371,26 @@ $(info ---------------------------------------------)
 
 all: $(TARGETS)
 
-# ── Verilator model library (built on demand for vect128/bf16 backends) ───────
+# ── Verilator model library (built on demand) ─────────────────────────────────
+# vect128 / bf16 backends: vec_mac_top
 $(OBJ_LIB)/Vvec_mac_top__ALL.a:
 	$(VERILATOR) $(VFLAGS_LIB) --top vec_mac_top --Mdir $(OBJ_LIB) \
 	    $(addprefix $(HDL_DIR)/,$(HDL_SRCS))
 	$(MAKE) -C $(OBJ_LIB) -f Vvec_mac_top.mk
 
+# systolic_vrl backend: sys_top (delegates to HDL_Systolic_16x32/Makefile)
+$(OBJ_LIB)/Vsys_top__ALL.a:
+	$(MAKE) -C $(HDL_DIR) lib
+
 # ── Accelerator HAL object ────────────────────────────────────────────────────
+accel_hal_systolic_vrl.o: accel_hal_systolic_vrl.cpp accel_hal.h $(OBJ_LIB)/Vsys_top__ALL.a
+	$(CXX) $(CXXFLAGS) $(ACCEL_FLAGS) -c $< -o $@
+
 accel_hal_verilator.o: accel_hal_verilator.cpp accel_hal.h $(OBJ_LIB)/Vvec_mac_top__ALL.a
 	$(CXX) $(CXXFLAGS) $(ACCEL_FLAGS) -c $< -o $@
+
+accel_hal_systolic_sw_$(ACCEL_PREC).o: accel_hal_software.c accel_hal.h
+	$(CC) $(CFLAGS) $(ACCEL_FLAGS) -c $< -o $@
 
 accel_hal_software_$(ACCEL_PREC).o: accel_hal_software.c accel_hal.h
 	$(CC) $(CFLAGS) $(ACCEL_FLAGS) -c $< -o $@
@@ -360,7 +398,7 @@ accel_hal_software_$(ACCEL_PREC).o: accel_hal_software.c accel_hal.h
 # ── Main targets ──────────────────────────────────────────────────────────────
 # If linking Verilator (C++) use g++; otherwise plain cc.
 ifeq ($(LINK_CXX), 1)
-train_gpt2: train_gpt2.c $(ACCEL_OBJ) $(OBJ_LIB)/Vvec_mac_top__ALL.a
+train_gpt2: train_gpt2.c $(ACCEL_OBJ) $(filter %.a,$(ACCEL_LIBS))
 	$(CXX) $(CFLAGS) $(CXXFLAGS) $(ACCEL_FLAGS) $(INCLUDES) $(LDFLAGS) \
 	    train_gpt2.c $(ACCEL_OBJ) $(ACCEL_LIBS) \
 	    $(LDLIBS) -lpthread -latomic $(OUTPUT_FILE)
@@ -371,8 +409,15 @@ train_gpt2: train_gpt2.c $(ACCEL_OBJ)
 	    $(LDLIBS) $(OUTPUT_FILE)
 endif
 
-test_gpt2: test_gpt2.c
-	$(CC) $(CFLAGS) $(INCLUDES) $(LDFLAGS) $^ $(LDLIBS) $(OUTPUT_FILE)
+ifeq ($(LINK_CXX), 1)
+test_gpt2: test_gpt2.c $(ACCEL_OBJ) $(filter %.a,$(ACCEL_LIBS))
+	$(CXX) $(CFLAGS) $(CXXFLAGS) $(ACCEL_FLAGS) $(INCLUDES) $(LDFLAGS) \
+	    test_gpt2.c $(ACCEL_OBJ) $(ACCEL_LIBS) $(LDLIBS) -lpthread -latomic $(OUTPUT_FILE)
+else
+test_gpt2: test_gpt2.c $(ACCEL_OBJ)
+	$(CC) $(CFLAGS) $(ACCEL_FLAGS) $(INCLUDES) $(LDFLAGS) \
+	    test_gpt2.c $(ACCEL_OBJ) $(ACCEL_LIBS) $(LDLIBS) $(OUTPUT_FILE)
+endif
 
 $(NVCC_CUDNN): llmc/cudnn_att.cpp
 	$(NVCC) -c $(NVCC_FLAGS) $(PFLAGS) $^ $(NVCC_INCLUDES) -o $@
@@ -393,7 +438,8 @@ profile_gpt2cu: profile_gpt2.cu $(NVCC_CUDNN)
 	$(NVCC) $(NVCC_FLAGS) $(PFLAGS) -lineinfo $^ $(NVCC_LDFLAGS) $(NVCC_INCLUDES) $(NVCC_LDLIBS)  $(CUDA_OUTPUT_FILE)
 
 clean:
-	$(REMOVE_FILES) $(TARGETS) accel_hal_software_*.o accel_hal_verilator.o
+	$(REMOVE_FILES) $(TARGETS) accel_hal_software_*.o accel_hal_systolic_sw_*.o \
+	                accel_hal_verilator.o accel_hal_systolic_vrl.o
 	$(REMOVE_BUILD_OBJECT_FILES)
 
 clean_verilator:

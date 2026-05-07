@@ -26,7 +26,17 @@
 #  define PREC_BF16_FP32
 #endif
 
-static float     sw_psum[ACCEL_VEC_SIZE];
+// ── Backend-specific tile dimensions ─────────────────────────────────────────
+// Systolic backends use 32-column × 16-row tiles; vector backends use 128×32.
+#if defined(ACCEL_BACKEND_SYSTOLIC) || defined(ACCEL_BACKEND_SYSTOLIC_VRL)
+#  define HAL_N  ACCEL_SYS_COLS   // 32 — output channels per tile
+#  define HAL_K  ACCEL_SYS_ROWS   // 16 — inner-product depth per tile
+#else
+#  define HAL_N  ACCEL_VEC_SIZE   // 128
+#  define HAL_K  ACCEL_K_DEPTH    // 32
+#endif
+
+static float     sw_psum[HAL_N];
 static long long sw_tile_count = 0;
 
 void accel_hal_init(void) {}
@@ -38,11 +48,11 @@ void accel_hal_free(void) {}
 
 void hal_compute_tile(const bf16_t* w_tile, const bf16_t* act, int first_tile) {
     if (first_tile)
-        for (int n = 0; n < ACCEL_VEC_SIZE; n++) sw_psum[n] = 0.0f;
-    for (int k = 0; k < ACCEL_K_DEPTH; k++) {
+        for (int n = 0; n < HAL_N; n++) sw_psum[n] = 0.0f;
+    for (int k = 0; k < HAL_K; k++) {
         float a = bf16_to_float(act[k]);
-        for (int n = 0; n < ACCEL_VEC_SIZE; n++)
-            sw_psum[n] += a * bf16_to_float(w_tile[k * ACCEL_VEC_SIZE + n]);
+        for (int n = 0; n < HAL_N; n++)
+            sw_psum[n] += a * bf16_to_float(w_tile[k * HAL_N + n]);
     }
     sw_tile_count++;
 }
@@ -59,11 +69,11 @@ static inline bf16_t fp32_to_bf16_trunc(float f) {
 
 void hal_compute_tile(const bf16_t* w_tile, const bf16_t* act, int first_tile) {
     if (first_tile)
-        for (int n = 0; n < ACCEL_VEC_SIZE; n++) sw_psum[n] = 0.0f;
-    for (int k = 0; k < ACCEL_K_DEPTH; k++) {
+        for (int n = 0; n < HAL_N; n++) sw_psum[n] = 0.0f;
+    for (int k = 0; k < HAL_K; k++) {
         float a = bf16_to_float(act[k]);
-        for (int n = 0; n < ACCEL_VEC_SIZE; n++) {
-            float w    = bf16_to_float(w_tile[k * ACCEL_VEC_SIZE + n]);
+        for (int n = 0; n < HAL_N; n++) {
+            float w    = bf16_to_float(w_tile[k * HAL_N + n]);
             float prod = bf16_to_float(fp32_to_bf16_trunc(a * w));
             float sum  = bf16_to_float(fp32_to_bf16_trunc(sw_psum[n] + prod));
             sw_psum[n] = sum;
@@ -82,14 +92,14 @@ static const char* prec_name = "BF16*BF16 -> BF16 accum";
 
 void hal_compute_tile(const bf16_t* w_tile, const bf16_t* act, int first_tile) {
     if (first_tile)
-        for (int n = 0; n < ACCEL_VEC_SIZE; n++) sw_psum[n] = 0.0f;
+        for (int n = 0; n < HAL_N; n++) sw_psum[n] = 0.0f;
 
     float max_a = 0.0f, max_w = 0.0f;
-    for (int k = 0; k < ACCEL_K_DEPTH; k++) {
+    for (int k = 0; k < HAL_K; k++) {
         float a = fabsf(bf16_to_float(act[k]));
         if (a > max_a) max_a = a;
-        for (int n = 0; n < ACCEL_VEC_SIZE; n++) {
-            float w = fabsf(bf16_to_float(w_tile[k * ACCEL_VEC_SIZE + n]));
+        for (int n = 0; n < HAL_N; n++) {
+            float w = fabsf(bf16_to_float(w_tile[k * HAL_N + n]));
             if (w > max_w) max_w = w;
         }
     }
@@ -97,10 +107,10 @@ void hal_compute_tile(const bf16_t* w_tile, const bf16_t* act, int first_tile) {
     float sw  = (max_w > 0.0f) ? max_w / 32767.0f : 1.0f;
     float so  = sa * sw;
 
-    for (int k = 0; k < ACCEL_K_DEPTH; k++) {
+    for (int k = 0; k < HAL_K; k++) {
         short qa = (short)(bf16_to_float(act[k]) / sa + 0.5f);
-        for (int n = 0; n < ACCEL_VEC_SIZE; n++) {
-            short qw = (short)(bf16_to_float(w_tile[k * ACCEL_VEC_SIZE + n]) / sw + 0.5f);
+        for (int n = 0; n < HAL_N; n++) {
+            short qw = (short)(bf16_to_float(w_tile[k * HAL_N + n]) / sw + 0.5f);
             sw_psum[n] += (float)((int)qa * (int)qw) * so;
         }
     }
@@ -117,14 +127,14 @@ static const char* prec_name = "INT16*INT16 -> FP32 accum (per-tile quant)";
 
 void hal_compute_tile(const bf16_t* w_tile, const bf16_t* act, int first_tile) {
     if (first_tile)
-        for (int n = 0; n < ACCEL_VEC_SIZE; n++) sw_psum[n] = 0.0f;
+        for (int n = 0; n < HAL_N; n++) sw_psum[n] = 0.0f;
 
     float max_a = 0.0f, max_w = 0.0f;
-    for (int k = 0; k < ACCEL_K_DEPTH; k++) {
+    for (int k = 0; k < HAL_K; k++) {
         float a = fabsf(bf16_to_float(act[k]));
         if (a > max_a) max_a = a;
-        for (int n = 0; n < ACCEL_VEC_SIZE; n++) {
-            float w = fabsf(bf16_to_float(w_tile[k * ACCEL_VEC_SIZE + n]));
+        for (int n = 0; n < HAL_N; n++) {
+            float w = fabsf(bf16_to_float(w_tile[k * HAL_N + n]));
             if (w > max_w) max_w = w;
         }
     }
@@ -132,11 +142,11 @@ void hal_compute_tile(const bf16_t* w_tile, const bf16_t* act, int first_tile) {
     float sw  = (max_w > 0.0f) ? max_w / 127.0f : 1.0f;
     float so  = sa * sw;
 
-    for (int k = 0; k < ACCEL_K_DEPTH; k++) {
+    for (int k = 0; k < HAL_K; k++) {
         signed char qa = (signed char)(bf16_to_float(act[k]) / sa + 0.5f);
-        for (int n = 0; n < ACCEL_VEC_SIZE; n++) {
+        for (int n = 0; n < HAL_N; n++) {
             signed char qw = (signed char)(
-                bf16_to_float(w_tile[k * ACCEL_VEC_SIZE + n]) / sw + 0.5f);
+                bf16_to_float(w_tile[k * HAL_N + n]) / sw + 0.5f);
             sw_psum[n] += (float)((int)qa * (int)qw) * so;
         }
     }
@@ -189,12 +199,12 @@ static float fp8_to_float(fp8_t fp8) {
 
 void hal_compute_tile(const bf16_t* w_tile, const bf16_t* act, int first_tile) {
     if (first_tile)
-        for (int n = 0; n < ACCEL_VEC_SIZE; n++) sw_psum[n] = 0.0f;
-    for (int k = 0; k < ACCEL_K_DEPTH; k++) {
+        for (int n = 0; n < HAL_N; n++) sw_psum[n] = 0.0f;
+    for (int k = 0; k < HAL_K; k++) {
         float a = fp8_to_float(float_to_fp8(bf16_to_float(act[k])));
-        for (int n = 0; n < ACCEL_VEC_SIZE; n++) {
+        for (int n = 0; n < HAL_N; n++) {
             float w = fp8_to_float(
-                float_to_fp8(bf16_to_float(w_tile[k * ACCEL_VEC_SIZE + n])));
+                float_to_fp8(bf16_to_float(w_tile[k * HAL_N + n])));
             sw_psum[n] += a * w;
         }
     }
@@ -206,14 +216,24 @@ static const char* prec_name = "FP8-E4M3*FP8-E4M3 -> FP32 accum";
 // =============================================================================
 // Common: readback and timing
 
+// hal_compute_tile_bwd — backward dinp computation.
+// For software backends the computation is identical to the forward pass:
+// BF16 MAC of transposed weights against the gradient vector.
+// The systolic Verilator backend overrides this with hardware-accurate
+// simulation using the separate backward weight SRAM.
+void hal_compute_tile_bwd(const bf16_t* wT_tile, const bf16_t* dout, int first_tile) {
+    // Re-use forward tile logic: same arithmetic, different semantic meaning.
+    hal_compute_tile(wT_tile, dout, first_tile);
+}
+
 void hal_read_results(float* out) {
-    __builtin_memcpy(out, sw_psum, ACCEL_VEC_SIZE * sizeof(float));
+    __builtin_memcpy(out, sw_psum, HAL_N * sizeof(float));
 }
 
 void accel_reset_timing(void) { sw_tile_count = 0; }
 
 void accel_print_timing(void) {
-    double cycles   = (double)sw_tile_count * ACCEL_K_DEPTH;
+    double cycles   = (double)sw_tile_count * HAL_K;
     double wall_sec = cycles / 606e6;
     printf("[accel/software] mode=%-42s tiles=%lld  projected_hw_time=%.4f s\n",
            prec_name, sw_tile_count, wall_sec);

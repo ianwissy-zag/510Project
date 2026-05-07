@@ -1,18 +1,15 @@
 // =============================================================================
-// accel_hal.h — Hardware Abstraction Layer for the BF16 vector MAC accelerator
+// accel_hal.h — Hardware Abstraction Layer for BF16 accelerator backends
 //
-// Provides a C-compatible interface to three backends:
-//   software   — pure C simulation of hardware behavior (default, fast)
-//   vect128    — Verilator cycle-accurate sim, HDL_Vect  (HardFloat FPU)
-//   bf16       — Verilator cycle-accurate sim, HDL_Vect_BF16 (custom FPU)
+// Backends (select at compile time):
+//   -DACCEL_BACKEND_SOFTWARE       pure-C simulation (default, fast)
+//   -DACCEL_BACKEND_VECT128        Verilator, HDL_Vect  (HardFloat FPU)
+//   -DACCEL_BACKEND_BF16           Verilator, HDL_Vect_BF16 (custom FPU)
+//   -DACCEL_BACKEND_SYSTOLIC       software sim of 16×32 systolic
+//   -DACCEL_BACKEND_SYSTOLIC_VRL   Verilator, HDL_Systolic_16x32
 //
-// Select backend at compile time:
-//   -DACCEL_BACKEND_SOFTWARE    (default)
-//   -DACCEL_BACKEND_VECT128
-//   -DACCEL_BACKEND_BF16
-//
-// Limit to one training step (default for Verilator — glacially slow):
-//   -DACCEL_SINGLE_PASS          (set by default in Makefile for Verilator)
+// The systolic backends additionally accelerate the backward dinp matmul
+// using the transposed weight SRAM and mode=BACKWARD control signal.
 // =============================================================================
 
 #pragma once
@@ -23,11 +20,15 @@ extern "C" {
 #include <stdint.h>
 #include <string.h>
 
-// ── Accelerator parameters (must match RTL parameters) ────────────────────────
-#define ACCEL_VEC_SIZE  128   // output channels per tile  (VEC_SIZE in RTL)
-#define ACCEL_K_DEPTH   32    // inner-product depth       (K_DEPTH  in RTL)
+// ── Vector MAC parameters (HDL_Vect*, software modes) ────────────────────────
+#define ACCEL_VEC_SIZE  128   // output channels per tile
+#define ACCEL_K_DEPTH   32    // inner-product depth
 
-// ── BF16 type and conversion ──────────────────────────────────────────────────
+// ── Systolic array parameters (HDL_Systolic_16x32) ───────────────────────────
+#define ACCEL_SYS_COLS  32    // output channels per tile (array columns)
+#define ACCEL_SYS_ROWS  16    // K_DEPTH (array rows)
+
+// ── BF16 helpers ──────────────────────────────────────────────────────────────
 typedef uint16_t bf16_t;
 
 static inline bf16_t float_to_bf16(float f) {
@@ -38,18 +39,24 @@ static inline float bf16_to_float(bf16_t b) {
 }
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
-// Call accel_hal_init() before any HAL operations, accel_hal_free() at exit.
 void accel_hal_init(void);
 void accel_hal_free(void);
 
-// ── Tile operations ───────────────────────────────────────────────────────────
-// w_tile  : K_DEPTH × VEC_SIZE BF16 values, row-major [k][n]
-// act     : K_DEPTH BF16 values
-// first_tile=1 seeds accumulators from zero; =0 accumulates onto previous result
+// ── Forward tile (all backends) ───────────────────────────────────────────────
+// w_tile  : K_DEPTH × VEC_SIZE (or SYS_ROWS × SYS_COLS) BF16, row-major
+// act     : K_DEPTH (or SYS_ROWS) BF16 activation values
+// first_tile=1 seeds accumulators from zero
 void hal_compute_tile(const bf16_t* w_tile, const bf16_t* act, int first_tile);
 
-// Read VEC_SIZE FP32 results from the accumulator into out[].
+// Read VEC_SIZE (or SYS_COLS) FP32 results into out[].
 void hal_read_results(float* out);
+
+// ── Backward dinp tile (systolic backends only) ───────────────────────────────
+// wT_tile : SYS_ROWS × SYS_COLS BF16 values of the TRANSPOSED weight matrix
+// dout    : SYS_ROWS BF16 gradient values
+// Computes dinp contribution: dinp[n] += sum_k(dout[k] * W^T[k][n])
+// Non-systolic backends fall back to the same BF16 MAC computation.
+void hal_compute_tile_bwd(const bf16_t* wT_tile, const bf16_t* dout, int first_tile);
 
 // ── Timing ────────────────────────────────────────────────────────────────────
 void accel_reset_timing(void);
