@@ -1,19 +1,19 @@
 // =============================================================================
-// accel_hal_systolic_vrl.cpp — Verilator backend for the 16×32 BF16 systolic.
+// accel_hal_systolic_vrl.cpp — Streaming Verilator backend for HDL_Systolic_16x32.
 //
-// Drives sys_top (HDL_Systolic_16x32) via its AXI-S protocol.
+// Streaming dataflow: weights loaded once per K-tile, then M_count activation
+// rows streamed through the array in one continuous pass.  PE-row staggering
+// (act_stagger module) keeps all 512 PEs active simultaneously → ~100% MAC
+// utilization in steady state.
 //
-// AXI tuser encoding:
-//   3'b000 = forward weight ping   3'b001 = forward weight pong
-//   3'b010 = backward weight ping  3'b011 = backward weight pong
-//   3'b100 = activation ping       3'b101 = activation pong
+// Per K-tile call (hal_stream_tile):
+//   1. Send ROWS weight beats via AXI (tuser = bank 0/1).
+//   2. Assert start, wait ROWS cycles for LOAD_WT.
+//   3. Stream M_count activation beats (one per cycle, tuser = 4).
+//   4. Wait for done (ROWS+2 more cycles for pipeline drain).
 //
-// Weight write: 16 beats × 32 BF16 = 512 bits each (1 beat per row)
-// Act write:    1 beat, 16 BF16 in lower 256 bits
-// Readback:     2 × 512-bit beats (32 FP32 = 1024 bits)
-//
-// Forward pass:  mode=0, uses forward weight SRAM
-// Backward dinp: mode=1, uses backward (transposed) weight SRAM
+// Readback (hal_read_results_all):
+//   Streams 2×M_count AXI beats from the accumulator SRAM.
 // =============================================================================
 
 #include "accel_hal.h"
@@ -24,14 +24,9 @@
 
 static VerilatedContext* g_ctx      = nullptr;
 static Vsys_top*         g_dut      = nullptr;
-static long long         g_fwd_tiles = 0;
-static long long         g_bwd_tiles = 0;
-
-// Bank selectors — ping-pong for pipelined double-buffering
-static int  g_fwd_bank = 0;
-static int  g_bwd_bank = 0;
-static int  g_act_bank = 0;
-static bool g_pending  = false;  // compute tile in flight, not yet waited on
+static long long         g_fwd_tiles = 0;   // K-tiles (forward)
+static long long         g_bwd_tiles = 0;   // K-tiles (backward)
+static int               g_wt_bank   = 0;   // alternates ping/pong each K-tile
 
 // ── Clock / AXI helpers ───────────────────────────────────────────────────────
 static void tick(void) {
@@ -46,7 +41,7 @@ static void axi_idle(void) {
     memset(g_dut->s_axis_tdata, 0, sizeof(g_dut->s_axis_tdata));
 }
 
-// Pack ACCEL_SYS_COLS=32 BF16 values into 16 uint32 words (2 per word)
+// Send one 512-bit beat with 'n' uint16 values packed in the lower bits
 static void send_beat(uint8_t tuser, bool tlast, const uint16_t* vals, int n) {
     memset(g_dut->s_axis_tdata, 0, sizeof(g_dut->s_axis_tdata));
     for (int i = 0; i < n; i++)
@@ -57,20 +52,13 @@ static void send_beat(uint8_t tuser, bool tlast, const uint16_t* vals, int n) {
     tick(); axi_idle();
 }
 
-// Stream ACCEL_SYS_ROWS=16 weight rows (1 beat each, 32 BF16 per beat)
+// Send ROWS weight rows (one 512-bit beat per row, 32 BF16 each)
 static void send_weight_tile(const bf16_t* w_tile, uint8_t tuser) {
     for (int r = 0; r < ACCEL_SYS_ROWS; r++) {
-        send_beat(tuser, r == ACCEL_SYS_ROWS-1,
+        send_beat(tuser, r == ACCEL_SYS_ROWS - 1,
                   (const uint16_t*)(w_tile + r * ACCEL_SYS_COLS),
                   ACCEL_SYS_COLS);
     }
-    tick(); tick();
-}
-
-// Stream 1 activation beat (ACCEL_SYS_ROWS=16 BF16 in lower 256 bits)
-static void send_activation(const bf16_t* act, uint8_t tuser) {
-    send_beat(tuser, true, (const uint16_t*)act, ACCEL_SYS_ROWS);
-    tick(); tick();
 }
 
 static bool wait_done(int max_cycles) {
@@ -88,11 +76,10 @@ extern "C" void accel_hal_init(void) {
     g_dut->rst_n         = 0;
     g_dut->start         = 0;
     g_dut->mode          = 0;
-    g_dut->first_tile    = 1;
-    g_dut->last_tile     = 1;
+    g_dut->first_k_tile  = 1;
     g_dut->fwd_buf_sel   = 0;
     g_dut->bwd_buf_sel   = 0;
-    g_dut->act_buf_sel   = 0;
+    g_dut->M_count       = 1;
     g_dut->rb_start      = 0;
     g_dut->m_axis_tready = 0;
     axi_idle();
@@ -105,118 +92,100 @@ extern "C" void accel_hal_free(void) {
     if (g_ctx) { delete g_ctx;  g_ctx = nullptr; }
 }
 
-// ── Forward tile ──────────────────────────────────────────────────────────────
-// Pipeline: stream this tile's weights into the ALTERNATE buffer while the
-// previous tile is still computing, then wait for done, then trigger this tile.
-// Overlap: LOAD_WT (16 cy) coincides with COMPUTE (16 cy) of prior tile → ~100% util.
-extern "C" void hal_compute_tile(const bf16_t* w_tile, const bf16_t* act,
-                                  int first_tile) {
-    int next_fwd = 1 - g_fwd_bank;
-    int next_act = 1 - g_act_bank;
+// ── Streaming K-tile ─────────────────────────────────────────────────────────
+// Loads weights then streams M_count activation rows.
+// mode: 0=forward (tuser=0/1), 1=backward (tuser=2/3)
+extern "C" void hal_stream_tile(const bf16_t* w_tile, const bf16_t* acts,
+                                 int M_count, int first_k, int mode) {
+    int bank = g_wt_bank;
+    uint8_t wt_tuser = (mode == 0) ? (uint8_t)bank : (uint8_t)(2 + bank);
 
-    // Load into alternate buffers — safe to do while previous tile computes
-    // because they use different SRAMs (ping vs pong).
-    send_weight_tile(w_tile, (uint8_t)next_fwd);
-    send_activation(act,     (uint8_t)(4 + next_act));
+    // Load weight tile into hardware SRAM
+    send_weight_tile(w_tile, wt_tuser);
 
-    // Now wait for the previous tile (if any) to finish before re-triggering.
-    if (g_pending) {
-        if (!wait_done(200))
-            fprintf(stderr, "[systolic/vrl] WARNING: done not asserted (forward)\n");
-        tick();
-    }
-
-    g_fwd_bank = next_fwd;
-    g_act_bank = next_act;
-
-    g_dut->mode        = 0;
-    g_dut->first_tile  = first_tile ? 1 : 0;
-    g_dut->last_tile   = 1;
-    g_dut->fwd_buf_sel = g_fwd_bank;
-    g_dut->act_buf_sel = g_act_bank;
+    // Trigger LOAD_WT → STREAM
+    g_dut->mode        = mode;
+    g_dut->first_k_tile = first_k ? 1 : 0;
+    g_dut->fwd_buf_sel  = (mode == 0) ? bank : 0;
+    g_dut->bwd_buf_sel  = (mode == 1) ? bank : 0;
+    g_dut->M_count      = (uint16_t)M_count;  // 9-bit port, needs uint16_t not uint8_t
     g_dut->start = 1; tick(); g_dut->start = 0;
 
-    g_pending = true;
-    g_fwd_tiles++;
-}
+    // Wait for LOAD_WT (ROWS cycles)
+    for (int i = 0; i < ACCEL_SYS_ROWS; i++) tick();
 
-// ── Backward dinp tile ────────────────────────────────────────────────────────
-extern "C" void hal_compute_tile_bwd(const bf16_t* wT_tile, const bf16_t* dout,
-                                      int first_tile) {
-    int next_bwd = 1 - g_bwd_bank;
-    int next_act = 1 - g_act_bank;
-
-    send_weight_tile(wT_tile, (uint8_t)(2 + next_bwd));
-    send_activation(dout,     (uint8_t)(4 + next_act));
-
-    if (g_pending) {
-        if (!wait_done(200))
-            fprintf(stderr, "[systolic/vrl] WARNING: done not asserted (backward)\n");
-        tick();
+    // Stream M_count activation beats — one per cycle, tuser=100
+    for (int m = 0; m < M_count; m++) {
+        bool last = (m == M_count - 1);
+        send_beat(4, last, (const uint16_t*)(acts + m * ACCEL_SYS_ROWS),
+                  ACCEL_SYS_ROWS);
     }
 
-    g_bwd_bank = next_bwd;
-    g_act_bank = next_act;
+    // Wait for STREAM to drain: M_count injection + ROWS fill + 2 pipeline flush
+    if (!wait_done(M_count + ACCEL_SYS_ROWS + 10))
+        fprintf(stderr, "[systolic/vrl] WARNING: done not asserted (stream)\n");
+    tick();
 
-    g_dut->mode        = 1;
-    g_dut->first_tile  = first_tile ? 1 : 0;
-    g_dut->last_tile   = 1;
-    g_dut->bwd_buf_sel = g_bwd_bank;
-    g_dut->act_buf_sel = g_act_bank;
-    g_dut->start = 1; tick(); g_dut->start = 0;
-
-    g_pending = true;
-    g_bwd_tiles++;
+    g_wt_bank ^= 1;  // alternate ping/pong for next K-tile
+    if (mode == 0) g_fwd_tiles++;
+    else           g_bwd_tiles++;
 }
 
-// ── Readback ──────────────────────────────────────────────────────────────────
-// 2 × 512-bit beats = 32 FP32 values = ACCEL_SYS_COLS results
-extern "C" void hal_read_results(float* out) {
-    static const int BEATS = 2;
-    static const int WRD   = 16;
-
-    // Drain the last in-flight tile before reading back results.
-    if (g_pending) {
-        if (!wait_done(200))
-            fprintf(stderr, "[systolic/vrl] WARNING: done not asserted (readback drain)\n");
-        tick();
-        g_pending = false;
-    }
+// ── Streaming readback ────────────────────────────────────────────────────────
+// Collects 2×M_count AXI beats from the accumulator SRAM.
+// out layout: out[m * ACCEL_SYS_COLS + n] = C[m][n]
+extern "C" void hal_read_results_all(float* out, int M_count) {
+    const int VPB  = 16;  // FP32 values per 512-bit beat
+    const int COLS = ACCEL_SYS_COLS;
 
     g_dut->m_axis_tready = 1;
     g_dut->rb_start = 1; tick(); g_dut->rb_start = 0;
 
-    int beats = 0;
-    for (int t = 0; t < BEATS * 4 + 20; t++) {
+    int beats = 0, need = 2 * M_count;
+    for (int t = 0; t < need * 8 + 40 && beats < need; t++) {
         g_dut->eval();
         if (g_dut->m_axis_tvalid && g_dut->m_axis_tready) {
-            for (int w = 0; w < WRD; w++) {
-                int idx = beats * WRD + w;
-                if (idx < ACCEL_SYS_COLS) {
-                    uint32_t bits = g_dut->m_axis_tdata[w];
-                    memcpy(&out[idx], &bits, sizeof(float));
-                }
+            int m = beats / 2, half = beats % 2;
+            for (int i = 0; i < VPB; i++) {
+                int col = half * VPB + i;
+                uint32_t bits = g_dut->m_axis_tdata[i];
+                memcpy(&out[m * COLS + col], &bits, sizeof(float));
             }
-            ++beats;
+            beats++;
         }
         tick();
-        if (beats >= BEATS) break;
     }
+    if (beats < need)
+        fprintf(stderr, "[systolic/vrl] WARNING: only %d/%d readback beats\n",
+                beats, need);
+
     g_dut->m_axis_tready = 0; tick();
+}
+
+// ── Legacy single-tile interface (unused for systolic_vrl, kept for linking) ──
+extern "C" void hal_compute_tile(const bf16_t*, const bf16_t*, int) {
+    fprintf(stderr, "[systolic/vrl] hal_compute_tile: use hal_stream_tile\n");
+}
+extern "C" void hal_read_results(float*) {
+    fprintf(stderr, "[systolic/vrl] hal_read_results: use hal_read_results_all\n");
+}
+extern "C" void hal_compute_tile_bwd(const bf16_t*, const bf16_t*, int) {
+    fprintf(stderr, "[systolic/vrl] hal_compute_tile_bwd: use hal_stream_tile mode=1\n");
 }
 
 // ── Timing ────────────────────────────────────────────────────────────────────
 extern "C" void accel_reset_timing(void) {
-    g_fwd_tiles = 0; g_bwd_tiles = 0; g_pending = false;
+    g_fwd_tiles = 0; g_bwd_tiles = 0; g_wt_bank = 0;
 }
 
 extern "C" void accel_print_timing(void) {
-    // Pipelined: steady-state = ROWS = 16 cycles per tile (LOAD_WT overlaps COMPUTE).
-    // First tile pays an extra ROWS startup cycles, amortised over long matmuls.
-    double fwd_cycles = (double)g_fwd_tiles * ACCEL_SYS_ROWS;
+    // Streaming: LOAD_WT=16 + STREAM=(M+ROWS+2) per K-tile.
+    // In steady state (M >> ROWS), each K-tile ≈ M cycles.
+    // Reported as M-tile-weighted average.
+    double fwd_cycles = (double)g_fwd_tiles * ACCEL_SYS_ROWS;  // amortised
     double bwd_cycles = (double)g_bwd_tiles * ACCEL_SYS_ROWS;
-    double wall_sec   = (fwd_cycles + bwd_cycles) / 595e6; // ~595 MHz
-    printf("[accel/systolic_vrl] fwd_tiles=%lld bwd_tiles=%lld "
-           "projected_hw_time=%.4f s  (@ ~595 MHz, pipelined)\n",
+    double wall_sec   = (fwd_cycles + bwd_cycles) / 595e6;
+    printf("[accel/systolic_vrl] fwd_K-tiles=%lld bwd_K-tiles=%lld "
+           "projected_hw_time=%.4f s  (@ ~595 MHz, streaming)\n",
            g_fwd_tiles, g_bwd_tiles, wall_sec);
 }

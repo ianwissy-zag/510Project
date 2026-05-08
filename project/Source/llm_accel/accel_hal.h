@@ -26,7 +26,7 @@ extern "C" {
 
 // ── Systolic array parameters (HDL_Systolic_16x32) ───────────────────────────
 #define ACCEL_SYS_COLS  32    // output channels per tile (array columns)
-#define ACCEL_SYS_ROWS  16    // K_DEPTH (array rows)
+#define ACCEL_SYS_ROWS  32    // K_DEPTH (array rows)
 
 // ── BF16 helpers ──────────────────────────────────────────────────────────────
 typedef uint16_t bf16_t;
@@ -42,7 +42,7 @@ static inline float bf16_to_float(bf16_t b) {
 void accel_hal_init(void);
 void accel_hal_free(void);
 
-// ── Forward tile (all backends) ───────────────────────────────────────────────
+// ── Forward tile — single-row interface (vector/software backends) ────────────
 // w_tile  : K_DEPTH × VEC_SIZE (or SYS_ROWS × SYS_COLS) BF16, row-major
 // act     : K_DEPTH (or SYS_ROWS) BF16 activation values
 // first_tile=1 seeds accumulators from zero
@@ -50,6 +50,17 @@ void hal_compute_tile(const bf16_t* w_tile, const bf16_t* act, int first_tile);
 
 // Read VEC_SIZE (or SYS_COLS) FP32 results into out[].
 void hal_read_results(float* out);
+
+// ── Streaming interface (systolic_vrl backend) ────────────────────────────────
+// Loads one K-tile of weights then streams M_count activation rows in one pass.
+// w_tile : SYS_ROWS × SYS_COLS BF16, packed row-major
+// acts   : M_count × SYS_ROWS BF16, one row of K-elements per M row
+// first_k: 1 = reset accumulator (first K-tile), 0 = accumulate
+void hal_stream_tile(const bf16_t* w_tile, const bf16_t* acts,
+                     int M_count, int first_k, int mode);
+
+// Read M_count × SYS_COLS FP32 results (all M rows at once).
+void hal_read_results_all(float* out, int M_count);
 
 // ── Backward dinp tile (systolic backends only) ───────────────────────────────
 // wT_tile : SYS_ROWS × SYS_COLS BF16 values of the TRANSPOSED weight matrix

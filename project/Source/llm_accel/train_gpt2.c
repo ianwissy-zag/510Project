@@ -176,6 +176,79 @@ void layernorm_backward(float* dinp, float* dweight, float* dbias,
 // out (M x N) = inp (M x K) * weight^T (N x K)
 // Tiles N in TILE_N chunks, K in TILE_K chunks.
 // Remainder columns/rows handled on CPU.
+
+#if defined(ACCEL_BACKEND_SYSTOLIC_VRL)
+// Streaming path: weights loaded once per K-tile, all M rows streamed together.
+// Loop order: (N-tile, K-tile) outer; M rows handled inside hal_stream_tile.
+// Static buffers avoid stack pressure for large M.
+static bf16_t s_w_tile[ACCEL_SYS_ROWS * ACCEL_SYS_COLS];
+static bf16_t s_acts_all[256 * ACCEL_SYS_ROWS];   // M_max=256 rows × K_DEPTH
+static float  s_result_all[256 * ACCEL_SYS_COLS];  // M_max=256 rows × N_TILE
+
+static void accel_matmul(float* out, const float* inp, const float* weight,
+                          int M, int K, int N) {
+    int N_tiles = N / TILE_N;
+    int N_rem   = N % TILE_N;
+    int K_tiles = K / TILE_K;
+    int K_rem   = K % TILE_K;
+
+    for (int nt = 0; nt < N_tiles; nt++) {
+        int n_base = nt * TILE_N;
+
+        for (int kt = 0; kt < K_tiles; kt++) {
+            int k_base  = kt * TILE_K;
+            int first_k = (kt == 0);
+
+            // Pack weight tile: TILE_K rows × TILE_N cols
+            for (int k = 0; k < TILE_K; k++)
+                for (int n = 0; n < TILE_N; n++)
+                    s_w_tile[k * TILE_N + n] =
+                        float_to_bf16(weight[(n_base + n) * K + k_base + k]);
+
+            // Pack all M rows' activation slice for this K-tile
+            for (int m = 0; m < M; m++)
+                for (int k = 0; k < TILE_K; k++)
+                    s_acts_all[m * TILE_K + k] =
+                        float_to_bf16(inp[m * K + k_base + k]);
+
+            hal_stream_tile(s_w_tile, s_acts_all, M, first_k, 0);
+        }
+
+        if (K_tiles > 0) {
+            hal_read_results_all(s_result_all, M);
+            for (int m = 0; m < M; m++)
+                for (int n = 0; n < TILE_N; n++)
+                    out[m * N + n_base + n] = s_result_all[m * TILE_N + n];
+        }
+
+        // K remainder on CPU
+        if (K_rem > 0) {
+            int k_base = K_tiles * TILE_K;
+            for (int m = 0; m < M; m++)
+                for (int k = 0; k < K_rem; k++) {
+                    float a = inp[m * K + k_base + k];
+                    for (int n = 0; n < TILE_N; n++)
+                        out[m * N + n_base + n] +=
+                            a * weight[(n_base + n) * K + k_base + k];
+                }
+        }
+    }
+
+    // N remainder on CPU
+    if (N_rem > 0) {
+        int n_base = N_tiles * TILE_N;
+        for (int m = 0; m < M; m++)
+            for (int n = 0; n < N_rem; n++) {
+                float val = 0.0f;
+                for (int k = 0; k < K; k++)
+                    val += inp[m * K + k] * weight[(n_base + n) * K + k];
+                out[m * N + n_base + n] = val;
+            }
+    }
+}
+
+#else
+// Non-streaming path: single-row tile interface (vector/software backends).
 static void accel_matmul(float* out, const float* inp, const float* weight,
                           int M, int K, int N) {
     bf16_t w_tile[TILE_K * TILE_N];
@@ -187,37 +260,26 @@ static void accel_matmul(float* out, const float* inp, const float* weight,
     int K_tiles = K / TILE_K;
     int K_rem   = K % TILE_K;
 
-    // ── Accelerator handles full N and K tiles ────────────────────────────────
     for (int nt = 0; nt < N_tiles; nt++) {
         int n_base = nt * TILE_N;
-
         for (int m = 0; m < M; m++) {
             for (int kt = 0; kt < K_tiles; kt++) {
                 int k_base  = kt * TILE_K;
                 int first_k = (kt == 0);
-
-                // Pack weight tile: rows=K_DEPTH, cols=VEC_SIZE
                 for (int k = 0; k < TILE_K; k++)
                     for (int n = 0; n < TILE_N; n++)
                         w_tile[k * TILE_N + n] =
                             float_to_bf16(weight[(n_base + n) * K + k_base + k]);
-
-                // Pack activation tile
                 for (int k = 0; k < TILE_K; k++)
                     act_tile[k] = float_to_bf16(inp[m * K + k_base + k]);
-
                 hal_compute_tile(w_tile, act_tile, first_k);
             }
-
-            // Read partial results from accelerator (or zero if no K tiles)
             if (K_tiles > 0)
                 hal_read_results(result_tile);
             else
                 memset(result_tile, 0, sizeof(result_tile));
-
-            // K remainder: accumulate into the local result buffer on CPU
             if (K_rem > 0) {
-                int k_base = K_tiles * ACCEL_K_DEPTH;
+                int k_base = K_tiles * TILE_K;
                 for (int k = 0; k < K_rem; k++) {
                     float a = inp[m * K + k_base + k];
                     for (int n = 0; n < TILE_N; n++)
@@ -228,10 +290,8 @@ static void accel_matmul(float* out, const float* inp, const float* weight,
                 out[m * N + n_base + n] = result_tile[n];
         }
     }
-
-    // ── N remainder: CPU handles leftover output columns ──────────────────────
     if (N_rem > 0) {
-        int n_base = N_tiles * ACCEL_VEC_SIZE;
+        int n_base = N_tiles * TILE_N;
         for (int m = 0; m < M; m++)
             for (int n = 0; n < N_rem; n++) {
                 float val = 0.0f;
@@ -241,6 +301,7 @@ static void accel_matmul(float* out, const float* inp, const float* weight,
             }
     }
 }
+#endif
 
 // =============================================================================
 // End accelerator interface
@@ -276,16 +337,54 @@ void matmul_forward_naive(float* out,
 static void accel_matmul_backward_dinp(float* dinp, const float* dout,
                                         const float* weight, int M, int K, int N) {
     // dinp[m][k] = sum_n( dout[m][n] * weight[n][k] )
-    // Treat as: dinp = dout x weight  (shape M×N times N×K = M×K)
-    // Remap: "output" dim = K (tiles of TILE_N), "inner" dim = N (tiles of TILE_K)
-    bf16_t wT_tile[TILE_K * TILE_N];  // transposed weight tile [n][k]
-    bf16_t dout_tile[TILE_K];         // gradient tile along N
-    float  result_tile[TILE_N];
-
+    // Remap: K tiles of TILE_N (output), N tiles of TILE_K (inner)
     int K_tiles = K / TILE_N;
     int K_rem   = K % TILE_N;
     int N_tiles = N / TILE_K;
     int N_rem   = N % TILE_K;
+
+#if defined(ACCEL_BACKEND_SYSTOLIC_VRL)
+    // Streaming backward: all M rows per (K-tile, N-tile) pass
+    static bf16_t s_wT_tile[ACCEL_SYS_ROWS * ACCEL_SYS_COLS];
+    static bf16_t s_dout_all[256 * ACCEL_SYS_ROWS];
+    static float  s_dinp_all[256 * ACCEL_SYS_COLS];
+
+    for (int kt = 0; kt < K_tiles; kt++) {
+        int k_base = kt * TILE_N;
+        for (int nt = 0; nt < N_tiles; nt++) {
+            int n_base  = nt * TILE_K;
+            int first_n = (nt == 0);
+            for (int n = 0; n < TILE_K; n++)
+                for (int k = 0; k < TILE_N; k++)
+                    s_wT_tile[n * TILE_N + k] =
+                        float_to_bf16(weight[(n_base+n)*K + k_base+k]);
+            for (int m = 0; m < M; m++)
+                for (int n = 0; n < TILE_K; n++)
+                    s_dout_all[m * TILE_K + n] =
+                        float_to_bf16(dout[m*N + n_base+n]);
+            hal_stream_tile(s_wT_tile, s_dout_all, M, first_n, 1);
+        }
+        if (N_tiles > 0) {
+            hal_read_results_all(s_dinp_all, M);
+            for (int m = 0; m < M; m++)
+                for (int k = 0; k < TILE_N; k++)
+                    dinp[m*K + k_base+k] += s_dinp_all[m * TILE_N + k];
+        }
+        if (N_rem > 0) {
+            int n_base = N_tiles * TILE_K;
+            for (int m = 0; m < M; m++)
+                for (int n = 0; n < N_rem; n++) {
+                    float d = dout[m*N + n_base+n];
+                    for (int k = 0; k < TILE_N; k++)
+                        dinp[m*K + k_base+k] += d * weight[(n_base+n)*K + k_base+k];
+                }
+        }
+    }
+#else
+    // Non-streaming backward (ACCEL_BACKEND_SYSTOLIC software sim)
+    bf16_t wT_tile[TILE_K * TILE_N];
+    bf16_t dout_tile[TILE_K];
+    float  result_tile[TILE_N];
 
     for (int kt = 0; kt < K_tiles; kt++) {
         int k_base = kt * TILE_N;
@@ -293,7 +392,6 @@ static void accel_matmul_backward_dinp(float* dinp, const float* dout,
             for (int nt = 0; nt < N_tiles; nt++) {
                 int n_base  = nt * TILE_K;
                 int first_n = (nt == 0);
-                // Pack wT_tile[n][k] = weight[n_base+n][k_base+k]
                 for (int n = 0; n < TILE_K; n++)
                     for (int k = 0; k < TILE_N; k++)
                         wT_tile[n * TILE_N + k] =
@@ -304,11 +402,10 @@ static void accel_matmul_backward_dinp(float* dinp, const float* dout,
             }
             if (N_tiles > 0) hal_read_results(result_tile);
             else              memset(result_tile, 0, sizeof(result_tile));
-            // N remainder on CPU
             if (N_rem > 0) {
                 int n_base = N_tiles * TILE_K;
                 for (int n = 0; n < N_rem; n++) {
-                    float d = dout[m*N + n_base + n];
+                    float d = dout[m*N + n_base+n];
                     for (int k = 0; k < TILE_N; k++)
                         result_tile[k] += d * weight[(n_base+n)*K + k_base+k];
                 }
@@ -317,7 +414,9 @@ static void accel_matmul_backward_dinp(float* dinp, const float* dout,
                 dinp[m*K + k_base+k] += result_tile[k];
         }
     }
-    // K remainder on CPU
+#endif
+
+    // K remainder on CPU (both paths)
     if (K_rem > 0) {
         int k_base = K_tiles * TILE_N;
         for (int m = 0; m < M; m++)

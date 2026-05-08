@@ -1,121 +1,103 @@
 `timescale 1ns / 1ps
 
-// Controller for the 16×32 BF16 systolic accelerator.
+// Controller for the 16×32 BF16 systolic accelerator — streaming M-row mode.
 //
-// Supports forward pass and backward dinp pass via the mode input.
-// In both modes, the dataflow is identical — only the weight SRAM selected differs.
+// State machine: IDLE → LOAD_WT → STREAM → DONE
 //
-// State machine: IDLE → LOAD_WT → COMPUTE → CAPTURE → DONE
+//   LOAD_WT (ROWS=16 cycles): reads weight SRAM row by row, shifts into PEs.
 //
-//   LOAD_WT (ROWS = 16 cycles): w_out is combinational so one cycle per row suffices.
-//   COMPUTE (ROWS = 16 cycles): broadcast act_in, psum propagates downward.
-//   CAPTURE: stores psum_out into accumulator or output SRAM.
-//   DONE: pulses done for one cycle.
+//   STREAM (M_count + ROWS cycles):
+//     Each cycle the act_stagger module receives one new activation slice
+//     (ROWS BF16 values — one K element per row) from the AXI bus.
+//     Row r of the stagger delays its input by r+1 cycles, so at stream
+//     cycle t PE[r] processes M row (t - r - 1).  After ROWS fill cycles,
+//     PE[ROWS-1] produces a valid result every cycle.
 //
-// K-tiling: LOAD_WT + COMPUTE repeats for each K-tile.
-//   first_tile=1: psum_in seeded from zero.
-//   last_tile=1:  output written to output_sram on CAPTURE.
+//     Accumulation across K-tiles:
+//       psum_in[0][c] = 0            (first_k_tile = 1)
+//       psum_in[0][c] = accum[m][c]  (subsequent K-tiles)
+//     The PEs add each K-tile's contribution inside the systolic array, so
+//     accum_wdata = psum_out (no separate FP32 adder needed in the controller).
+//
+//   act_in to the systolic array is driven by the act_stagger module output,
+//   wired externally in top.sv — the controller does not drive act_in.
 //
 // Reset: asynchronous active-low.
 
 module controller #(
     parameter ROWS        = 16,
     parameter COLS        = 32,
-    parameter ACT_WIDTH   = 16,
     parameter WT_WIDTH    = 16,
     parameter PSUM_WIDTH  = 32,
-    parameter ADDR_WIDTH  = $clog2(ROWS)
+    parameter M_MAX       = 256,
+    parameter ADDR_WIDTH  = $clog2(ROWS),
+    parameter M_ADDR_W    = $clog2(M_MAX + 1)
 )(
     input  logic clk,
     input  logic rst_n,
 
     // Host control
-    input  logic start,
-    input  logic mode,         // 0=forward, 1=backward dinp
-    input  logic first_tile,   // seed accumulators from zero
-    input  logic last_tile,    // write result to output SRAM
-    input  logic act_buf_sel,  // 0=ping, 1=pong
-    input  logic fwd_buf_sel,  // forward weight bank: 0=ping, 1=pong
-    input  logic bwd_buf_sel,  // backward weight bank: 0=ping, 1=pong
-    output logic done,
+    input  logic                  start,
+    input  logic                  mode,         // 0=forward, 1=backward dinp
+    input  logic                  first_k_tile, // 1→seed psum from zero
+    input  logic                  fwd_buf_sel,
+    input  logic                  bwd_buf_sel,
+    input  logic [M_ADDR_W-1:0]   M_count,      // number of M rows to stream
+    output logic                  done,
 
-    // Weight SRAM read (forward ping/pong)
+    // Forward weight SRAM read (ping/pong)
     output logic [ADDR_WIDTH-1:0]      fwd_wt_addr_0, fwd_wt_addr_1,
     output logic                       fwd_wt_re_0,   fwd_wt_re_1,
     input  logic [COLS*WT_WIDTH-1:0]   fwd_wt_rdata_0, fwd_wt_rdata_1,
 
-    // Weight SRAM read (backward ping/pong)
+    // Backward weight SRAM read (ping/pong)
     output logic [ADDR_WIDTH-1:0]      bwd_wt_addr_0, bwd_wt_addr_1,
     output logic                       bwd_wt_re_0,   bwd_wt_re_1,
     input  logic [COLS*WT_WIDTH-1:0]   bwd_wt_rdata_0, bwd_wt_rdata_1,
 
-    // Activation SRAM read
-    output logic                       act_re_0, act_re_1,
-    input  logic [ROWS*ACT_WIDTH-1:0]  act_rdata_0, act_rdata_1,
-
-    // Systolic array control
+    // Systolic array weight input and psum
     output logic                           load_wt,
     output logic [COLS-1:0][WT_WIDTH-1:0]  wt_in,
-    output logic [ROWS-1:0][ACT_WIDTH-1:0] act_in,
     output logic [COLS-1:0][PSUM_WIDTH-1:0] psum_in,
     input  logic [COLS-1:0][PSUM_WIDTH-1:0] psum_out,
 
-    // Output SRAM write
-    output logic                        out_we,
-    output logic [COLS*PSUM_WIDTH-1:0]  out_wdata
+    // Stagger enable (to act_stagger module in top.sv)
+    output logic stagger_en,
+
+    // Accumulator SRAM interface
+    output logic                       accum_we,
+    output logic [M_ADDR_W-1:0]        accum_rd_addr,  // psum_in[0] lookup
+    output logic [M_ADDR_W-1:0]        accum_wr_addr,  // output capture
+    output logic [COLS*PSUM_WIDTH-1:0] accum_wdata,    // = psum_out (packed)
+    input  logic [COLS*PSUM_WIDTH-1:0] accum_rdata     // old accum value for psum_in
 );
-    // State machine
-    typedef enum logic [2:0] {
-        IDLE, LOAD_WT, COMPUTE, CAPTURE, DONE_ST
-    } state_t;
-
+    // ── State machine ─────────────────────────────────────────────────────────
+    typedef enum logic [1:0] { IDLE, LOAD_WT, STREAM, DONE_ST } state_t;
     state_t state;
-    logic [ADDR_WIDTH-1:0] counter;  // LOAD_WT and COMPUTE both need up to ROWS-1 = 15
 
-    // Accumulator register (FP32, one per column)
-    logic [COLS-1:0][PSUM_WIDTH-1:0] accum_reg;
+    logic [ADDR_WIDTH-1:0] wt_cnt;     // LOAD_WT row counter
+    logic [8:0]            stream_cnt; // STREAM cycle counter (needs 9 bits: max 256+16=272)
 
-    // Selected weight data
+    // ── Weight SRAM mux ───────────────────────────────────────────────────────
     logic [COLS*WT_WIDTH-1:0] wt_rdata_mux;
     always_comb begin
-        if (!mode) // forward
+        if (!mode)
             wt_rdata_mux = fwd_buf_sel ? fwd_wt_rdata_1 : fwd_wt_rdata_0;
-        else       // backward
+        else
             wt_rdata_mux = bwd_buf_sel ? bwd_wt_rdata_1 : bwd_wt_rdata_0;
     end
 
-    // Selected activation data
-    logic [ROWS*ACT_WIDTH-1:0] act_rdata_mux;
-    assign act_rdata_mux = act_buf_sel ? act_rdata_1 : act_rdata_0;
-
-    // Unpack wt_rdata_mux to per-column format
     genvar c;
     generate
-        for (c = 0; c < COLS; c++) begin : g_wt_unpack
+        for (c = 0; c < COLS; c++)
             assign wt_in[c] = wt_rdata_mux[c*WT_WIDTH +: WT_WIDTH];
-        end
     endgenerate
 
-    // Unpack act_rdata_mux to per-row format
-    genvar r;
-    generate
-        for (r = 0; r < ROWS; r++) begin : g_act_unpack
-            assign act_in[r] = act_rdata_mux[r*ACT_WIDTH +: ACT_WIDTH];
-        end
-    endgenerate
-
-    // psum_in: zero on first tile, accumulator on subsequent tiles
-    generate
-        for (c = 0; c < COLS; c++) begin : g_psum_in
-            assign psum_in[c] = first_tile ? '0 : accum_reg[c];
-        end
-    endgenerate
-
-    // Weight SRAM address: one row per cycle, direct counter mapping.
-    assign fwd_wt_addr_0 = counter;
-    assign fwd_wt_addr_1 = counter;
-    assign bwd_wt_addr_0 = counter;
-    assign bwd_wt_addr_1 = counter;
+    // ── Weight SRAM addresses / read enables ─────────────────────────────────
+    assign fwd_wt_addr_0 = wt_cnt;
+    assign fwd_wt_addr_1 = wt_cnt;
+    assign bwd_wt_addr_0 = wt_cnt;
+    assign bwd_wt_addr_1 = wt_cnt;
 
     logic in_load;
     assign in_load = (state == LOAD_WT);
@@ -124,69 +106,91 @@ module controller #(
     assign fwd_wt_re_1 = in_load && !mode &&  fwd_buf_sel;
     assign bwd_wt_re_0 = in_load &&  mode && !bwd_buf_sel;
     assign bwd_wt_re_1 = in_load &&  mode &&  bwd_buf_sel;
-    assign act_re_0    = (state == COMPUTE) && !act_buf_sel;
-    assign act_re_1    = (state == COMPUTE) &&  act_buf_sel;
 
-    assign load_wt  = (state == LOAD_WT);
-    assign done     = (state == DONE_ST);
-    assign out_we   = (state == CAPTURE) && last_tile;
-    assign out_wdata = {COLS{1'b0}};   // overridden below
+    assign load_wt    = in_load;
+    assign stagger_en = (state == STREAM);
 
-    // Pack psum_out for output SRAM write
-    logic [COLS*PSUM_WIDTH-1:0] psum_out_flat;
+    // ── STREAM timing ─────────────────────────────────────────────────────────
+    // PE[ROWS-1] registers its output, so the result for M row m is available
+    // in psum_out one cycle AFTER PE[ROWS-1] computes it.
+    // PE[ROWS-1] computes M row m at posedge stream_cnt = m + ROWS.
+    // Result is in psum_out at pre-posedge of stream_cnt = m + ROWS + 1.
+    // → write at stream_cnt = m + ROWS + 1, so m_out = stream_cnt - ROWS - 1.
+    logic [M_ADDR_W-1:0] m_out;
+    logic out_valid;
+
+    assign m_out     = stream_cnt[M_ADDR_W-1:0] - M_ADDR_W'(ROWS + 1);
+    assign out_valid = (state == STREAM)
+                    && (stream_cnt >= 9'(ROWS + 1))
+                    && (stream_cnt <  9'(ROWS + 1) + 9'(M_count));
+
+    // ── Accumulator SRAM drives ───────────────────────────────────────────────
+    // rd_addr: M row PE[0] is currently processing = stream_cnt - 1
+    // wr_addr: m_out (valid when out_valid)
+    // wdata  : psum_out from PE[ROWS-1] (the FP32 addition already happened
+    //          inside the systolic PEs — no separate adder needed here)
+    assign accum_rd_addr = (stream_cnt > '0)
+                           ? stream_cnt[M_ADDR_W-1:0] - M_ADDR_W'(1)
+                           : '0;
+    assign accum_wr_addr = m_out;
+    assign accum_we      = out_valid;
+
     generate
-        for (c = 0; c < COLS; c++) begin : g_psum_flat
-            assign psum_out_flat[c*PSUM_WIDTH +: PSUM_WIDTH] = psum_out[c];
-        end
+        for (c = 0; c < COLS; c++)
+            assign accum_wdata[c*PSUM_WIDTH +: PSUM_WIDTH] = psum_out[c];
     endgenerate
 
-    // State machine
+    // ── psum_in[0]: accumulated value or zero ─────────────────────────────────
+    // PE[0] sees M row m = stream_cnt - 1 (1-cycle stagger delay for row 0).
+    // For K-tile > 0: inject the previously accumulated partial sum so the
+    // systolic PEs add each K-tile's contribution in place.
+    logic use_accum;
+    assign use_accum = (state == STREAM) && (stream_cnt != '0) && !first_k_tile;
+
+    generate
+        for (c = 0; c < COLS; c++)
+            assign psum_in[c] = use_accum
+                                 ? accum_rdata[c*PSUM_WIDTH +: PSUM_WIDTH]
+                                 : '0;
+    endgenerate
+
+    // ── Done ─────────────────────────────────────────────────────────────────
+    assign done = (state == DONE_ST);
+
+    // ── State machine ─────────────────────────────────────────────────────────
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            state   <= IDLE;
-            counter <= '0;
-            accum_reg <= '0;
+            state      <= IDLE;
+            wt_cnt     <= '0;
+            stream_cnt <= '0;
         end else begin
             case (state)
                 IDLE: begin
                     if (start) begin
-                        state   <= LOAD_WT;
-                        counter <= '0;
+                        state  <= LOAD_WT;
+                        wt_cnt <= '0;
                     end
                 end
 
                 LOAD_WT: begin
-                    if (counter == ADDR_WIDTH'(ROWS - 1)) begin
-                        state   <= COMPUTE;
-                        counter <= '0;
+                    if (wt_cnt == ADDR_WIDTH'(ROWS - 1)) begin
+                        state      <= STREAM;
+                        stream_cnt <= '0;
                     end else
-                        counter <= counter + 1'b1;
+                        wt_cnt <= wt_cnt + 1'b1;
                 end
 
-                COMPUTE: begin
-                    if (counter == ROWS[$clog2(ROWS):0] - 1) begin
-                        state   <= CAPTURE;
-                        counter <= '0;
-                    end else
-                        counter <= counter + 1'b1;
+                STREAM: begin
+                    // M_count injection + ROWS fill/drain + 1 pipeline flush
+                    if (stream_cnt == 9'(M_count) + 9'(ROWS) + 9'(1))
+                        state <= DONE_ST;
+                    else
+                        stream_cnt <= stream_cnt + 1'b1;
                 end
 
-                CAPTURE: begin
-                    // Store psum_out into accumulator
-                    for (int i = 0; i < COLS; i++)
-                        accum_reg[i] <= psum_out[i];
-                    state <= DONE_ST;
-                end
-
-                DONE_ST:
-                    state <= IDLE;
-
+                DONE_ST: state <= IDLE;
                 default: state <= IDLE;
             endcase
         end
     end
-
-    // Output SRAM write data (driven combinationally from psum_out on CAPTURE)
-    assign out_wdata = (state == CAPTURE) ? psum_out_flat : '0;
-
 endmodule
