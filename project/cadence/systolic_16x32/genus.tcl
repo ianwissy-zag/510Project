@@ -1,18 +1,20 @@
 # =============================================================================
-# genus.tcl — Cadence Genus synthesis script for sys_top (16×32 BF16 systolic)
+# genus.tcl — Cadence Genus synthesis script for sys_top (32×32 BF16 systolic)
 # Target PDK: ASAP7 predictive 7nm (RVT standard cells)
 #
-# 16-row × 32-column weight-stationary systolic array with custom BF16×BF16
-# multiplier and FP32 accumulation. Supports forward and backward dinp passes
-# via separate forward and transposed weight SRAMs.
+# 32-row × 32-column weight-stationary systolic array with classical staggered
+# M-row streaming dataflow, custom BF16×BF16 multiplier, FP32 accumulation.
+# Supports forward and backward passes via separate weight SRAMs.
 #
 # Design: sys_top (HDL_Systolic_16x32/)
-#   512 MACs (16×32) — same MAC count as the 128-wide vector design
-#   LOAD_WT = 32 cycles, COMPUTE = 16 cycles per K-tile
+#   1024 MACs (32×32)
+#   LOAD_WT = 32 cycles, STREAM = M_count + ROWS + 2 cycles per K-tile
+#   act_stagger: triangular delay buffer for classical systolic activation flow
+#   accum_sram:  M×COLS FP32 accumulator across K-tiles
 #
 # Expected runtime: comparable to the 128-wide BF16 run (~4-6 hours).
 # The bf16_mac_unit hierarchy is synthesised once and replicated across all
-# 512 PEs via hierarchical synthesis.
+# 1024 PEs via hierarchical synthesis.
 #
 # Usage:
 #   genus -f genus.tcl |& tee genus.log
@@ -41,7 +43,7 @@ set_db syn_map_effort       medium
 set_db syn_opt_effort       medium
 
 # Hierarchical synthesis — pe (and its bf16_mac_unit) synthesised once,
-# replicated across all 16×32=512 PE instances.
+# replicated across all 32×32=1024 PE instances.
 set_db auto_ungroup         none
 
 # ── Read libraries ────────────────────────────────────────────────────────────
@@ -54,8 +56,8 @@ read_hdl -sv               ../../HDL_Systolic_16x32/bf16_mac_unit.sv
 read_hdl -sv               ../../HDL_Systolic_16x32/pe.sv
 read_hdl -sv               ../../HDL_Systolic_16x32/systolic_16x32.sv
 read_hdl -sv               ../../HDL_Systolic_16x32/weight_sram.sv
-read_hdl -sv               ../../HDL_Systolic_16x32/act_sram.sv
-read_hdl -sv               ../../HDL_Systolic_16x32/output_sram.sv
+read_hdl -sv               ../../HDL_Systolic_16x32/act_stagger.sv
+read_hdl -sv               ../../HDL_Systolic_16x32/accum_sram.sv
 read_hdl -sv               ../../HDL_Systolic_16x32/axi.sv
 read_hdl -sv               ../../HDL_Systolic_16x32/controller.sv
 read_hdl -sv               ../../HDL_Systolic_16x32/axi_readback.sv

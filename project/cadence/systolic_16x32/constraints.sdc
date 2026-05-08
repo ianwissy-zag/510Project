@@ -1,4 +1,4 @@
-# Timing constraints for sys_top (16×32 BF16 systolic accelerator)
+# Timing constraints for sys_top (32×32 BF16 systolic accelerator)
 # Target: ASAP7 predictive 7nm, ~606 MHz (1650 ps period)
 #
 # Same timing target as the BF16 vector designs — critical path is one
@@ -16,8 +16,8 @@ set_input_delay -clock clk -max 165 $axi_slave_inputs
 set_input_delay -clock clk -min  33 $axi_slave_inputs
 
 set ctrl_inputs [get_ports {
-    start mode first_tile last_tile act_buf_sel fwd_buf_sel bwd_buf_sel
-    rb_start m_axis_tready
+    start mode first_k_tile fwd_buf_sel bwd_buf_sel
+    M_count[*] rb_start m_axis_tready
 }]
 set_input_delay -clock clk -max 165 $ctrl_inputs
 set_input_delay -clock clk -min  33 $ctrl_inputs

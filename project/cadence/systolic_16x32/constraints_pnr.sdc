@@ -1,4 +1,4 @@
-# Timing constraints for sys_top (16x32 BF16 systolic) — P&R target — P&R target
+# Timing constraints for sys_top (32x32 BF16 systolic) — P&R target
 # Target: ASAP7 predictive 7nm, ~588 MHz (1700 ps period)
 #
 # Period specified explicitly in picoseconds to avoid tool unit ambiguity.
@@ -24,7 +24,8 @@ set_input_delay -clock clk -max 170 $axi_slave_inputs
 set_input_delay -clock clk -min  34 $axi_slave_inputs
 
 set ctrl_inputs [get_ports {
-    start act_buf_sel first_tile last_tile wt_buf_sel rb_start m_axis_tready
+    start mode first_k_tile fwd_buf_sel bwd_buf_sel
+    M_count[*] rb_start m_axis_tready
 }]
 set_input_delay -clock clk -max 170 $ctrl_inputs
 set_input_delay -clock clk -min  34 $ctrl_inputs

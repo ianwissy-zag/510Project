@@ -1,5 +1,5 @@
 # =============================================================================
-# innovus.tcl — Cadence Innovus P&R script for sys_top (16×32 BF16 systolic)
+# innovus.tcl — Cadence Innovus P&R script for sys_top (32×32 BF16 systolic)
 # Target PDK: ASAP7 predictive 7nm RVT
 #
 # Usage (run after genus.tcl completes):
@@ -45,9 +45,9 @@ set init_sdcfile    [list [file normalize $script_dir/constraints_pnr.sdc]]
 init_design
 
 # ── Floorplan ─────────────────────────────────────────────────────────────────
-# 512 MACs at ASAP7 density, similar cell count to the 128-wide BF16 design.
-# 1000×1000 um at 45% utilisation as starting point.
-floorPlan -r 1.0 0.45 2.0 2.0 2.0 2.0
+# 1024 MACs at ASAP7 density — roughly 2× the previous 16×32 design.
+# 1200×1200 um at 45% utilisation as starting point.
+floorPlan -r 1.0 0.45 2.0 2.0 2.0 2.0   ;# 1200×1200 aspect 1.0, 45% util
 
 # ── Power distribution ────────────────────────────────────────────────────────
 addRing -nets {VDD VSS} \
