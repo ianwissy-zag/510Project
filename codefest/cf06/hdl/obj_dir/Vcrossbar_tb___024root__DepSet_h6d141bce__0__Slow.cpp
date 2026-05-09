@@ -11,6 +11,14 @@ VL_ATTR_COLD void Vcrossbar_tb___024root___eval_static(Vcrossbar_tb___024root* v
     VL_DEBUG_IF(VL_DBG_MSGF("+    Vcrossbar_tb___024root___eval_static\n"); );
 }
 
+VL_ATTR_COLD void Vcrossbar_tb___024root___eval_initial__TOP(Vcrossbar_tb___024root* vlSelf) {
+    if (false && vlSelf) {}  // Prevent unused
+    Vcrossbar_tb__Syms* const __restrict vlSymsp VL_ATTR_UNUSED = vlSelf->vlSymsp;
+    VL_DEBUG_IF(VL_DBG_MSGF("+    Vcrossbar_tb___024root___eval_initial__TOP\n"); );
+    // Body
+    vlSelf->crossbar_tb__DOT__clk = 0U;
+}
+
 VL_ATTR_COLD void Vcrossbar_tb___024root___eval_final(Vcrossbar_tb___024root* vlSelf) {
     if (false && vlSelf) {}  // Prevent unused
     Vcrossbar_tb__Syms* const __restrict vlSymsp VL_ATTR_UNUSED = vlSelf->vlSymsp;
@@ -64,7 +72,7 @@ VL_ATTR_COLD void Vcrossbar_tb___024root___dump_triggers__stl(Vcrossbar_tb___024
 }
 #endif  // VL_DEBUG
 
-void Vcrossbar_tb___024root___act_sequent__TOP__0(Vcrossbar_tb___024root* vlSelf);
+void Vcrossbar_tb___024root___act_comb__TOP__0(Vcrossbar_tb___024root* vlSelf);
 
 VL_ATTR_COLD void Vcrossbar_tb___024root___eval_stl(Vcrossbar_tb___024root* vlSelf) {
     if (false && vlSelf) {}  // Prevent unused
@@ -72,12 +80,7 @@ VL_ATTR_COLD void Vcrossbar_tb___024root___eval_stl(Vcrossbar_tb___024root* vlSe
     VL_DEBUG_IF(VL_DBG_MSGF("+    Vcrossbar_tb___024root___eval_stl\n"); );
     // Body
     if ((1ULL & vlSelf->__VstlTriggered.word(0U))) {
-        Vcrossbar_tb___024root___act_sequent__TOP__0(vlSelf);
-        vlSelf->__Vm_traceActivity[4U] = 1U;
-        vlSelf->__Vm_traceActivity[3U] = 1U;
-        vlSelf->__Vm_traceActivity[2U] = 1U;
-        vlSelf->__Vm_traceActivity[1U] = 1U;
-        vlSelf->__Vm_traceActivity[0U] = 1U;
+        Vcrossbar_tb___024root___act_comb__TOP__0(vlSelf);
     }
 }
 
@@ -108,7 +111,10 @@ VL_ATTR_COLD void Vcrossbar_tb___024root___dump_triggers__act(Vcrossbar_tb___024
         VL_DBG_MSGF("         No triggers active\n");
     }
     if ((1ULL & vlSelf->__VactTriggered.word(0U))) {
-        VL_DBG_MSGF("         'act' region trigger index 0 is active: @([true] __VdlySched.awaitingCurrentTime())\n");
+        VL_DBG_MSGF("         'act' region trigger index 0 is active: @(posedge crossbar_tb.clk)\n");
+    }
+    if ((2ULL & vlSelf->__VactTriggered.word(0U))) {
+        VL_DBG_MSGF("         'act' region trigger index 1 is active: @([true] __VdlySched.awaitingCurrentTime())\n");
     }
 }
 #endif  // VL_DEBUG
@@ -123,7 +129,10 @@ VL_ATTR_COLD void Vcrossbar_tb___024root___dump_triggers__nba(Vcrossbar_tb___024
         VL_DBG_MSGF("         No triggers active\n");
     }
     if ((1ULL & vlSelf->__VnbaTriggered.word(0U))) {
-        VL_DBG_MSGF("         'nba' region trigger index 0 is active: @([true] __VdlySched.awaitingCurrentTime())\n");
+        VL_DBG_MSGF("         'nba' region trigger index 0 is active: @(posedge crossbar_tb.clk)\n");
+    }
+    if ((2ULL & vlSelf->__VnbaTriggered.word(0U))) {
+        VL_DBG_MSGF("         'nba' region trigger index 1 is active: @([true] __VdlySched.awaitingCurrentTime())\n");
     }
 }
 #endif  // VL_DEBUG
@@ -133,6 +142,8 @@ VL_ATTR_COLD void Vcrossbar_tb___024root___ctor_var_reset(Vcrossbar_tb___024root
     Vcrossbar_tb__Syms* const __restrict vlSymsp VL_ATTR_UNUSED = vlSelf->vlSymsp;
     VL_DEBUG_IF(VL_DBG_MSGF("+    Vcrossbar_tb___024root___ctor_var_reset\n"); );
     // Body
+    vlSelf->crossbar_tb__DOT__clk = VL_RAND_RESET_I(1);
+    vlSelf->crossbar_tb__DOT__rst = VL_RAND_RESET_I(1);
     for (int __Vi0 = 0; __Vi0 < 4; ++__Vi0) {
         vlSelf->crossbar_tb__DOT__acts_i[__Vi0] = VL_RAND_RESET_I(8);
     }
@@ -145,7 +156,8 @@ VL_ATTR_COLD void Vcrossbar_tb___024root___ctor_var_reset(Vcrossbar_tb___024root
             vlSelf->crossbar_tb__DOT__dut__DOT__mult_results[__Vi0][__Vi1] = VL_RAND_RESET_I(9);
         }
     }
-    for (int __Vi0 = 0; __Vi0 < 5; ++__Vi0) {
-        vlSelf->__Vm_traceActivity[__Vi0] = 0;
+    for (int __Vi0 = 0; __Vi0 < 4; ++__Vi0) {
+        vlSelf->crossbar_tb__DOT__dut__DOT__col_sum[__Vi0] = VL_RAND_RESET_I(10);
     }
+    vlSelf->__Vtrigprevexpr___TOP__crossbar_tb__DOT__clk__0 = VL_RAND_RESET_I(1);
 }

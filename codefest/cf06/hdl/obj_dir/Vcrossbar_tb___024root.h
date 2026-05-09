@@ -15,18 +15,22 @@ class alignas(VL_CACHE_LINE_BYTES) Vcrossbar_tb___024root final : public Verilat
   public:
 
     // DESIGN SPECIFIC STATE
+    CData/*0:0*/ crossbar_tb__DOT__clk;
+    CData/*0:0*/ crossbar_tb__DOT__rst;
     SData/*15:0*/ crossbar_tb__DOT__weights_i;
     CData/*0:0*/ __VstlFirstIteration;
+    CData/*0:0*/ __Vtrigprevexpr___TOP__crossbar_tb__DOT__clk__0;
     CData/*0:0*/ __VactContinue;
     IData/*31:0*/ __VactIterCount;
     VlUnpacked<CData/*7:0*/, 4> crossbar_tb__DOT__acts_i;
     VlUnpacked<SData/*9:0*/, 4> crossbar_tb__DOT__mac_outs_o;
     VlUnpacked<VlUnpacked<SData/*8:0*/, 4>, 4> crossbar_tb__DOT__dut__DOT__mult_results;
-    VlUnpacked<CData/*0:0*/, 5> __Vm_traceActivity;
+    VlUnpacked<SData/*9:0*/, 4> crossbar_tb__DOT__dut__DOT__col_sum;
     VlDelayScheduler __VdlySched;
+    VlTriggerScheduler __VtrigSched_h99f9162d__0;
     VlTriggerVec<1> __VstlTriggered;
-    VlTriggerVec<1> __VactTriggered;
-    VlTriggerVec<1> __VnbaTriggered;
+    VlTriggerVec<2> __VactTriggered;
+    VlTriggerVec<2> __VnbaTriggered;
 
     // INTERNAL VARIABLES
     Vcrossbar_tb__Syms* const vlSymsp;
