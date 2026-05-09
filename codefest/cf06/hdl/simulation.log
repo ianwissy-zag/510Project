@@ -1,0 +1,24 @@
+===============================================================
+   4x4 MAC Crossbar Testbench
+   Weight Encoding: 0 = +1, 1 = -1
+===============================================================
+
+Test Case 1: User Request
+Inputs: [10, 20, 30, 40]
+Expected Outputs: Col0: -40, Col1: 0, Col2: -20, Col3: -20
+Actual Outputs  : Col0: -40, Col1: 0, Col2: -20, Col3: -20
+
+Test Case 2: Negative Inputs / Extreme Values
+Inputs: [-128, 127, -50, 0]
+Expected Outputs: Col0: -51, Col1: 51, Col2: -305, Col3: 305
+Actual Outputs  : Col0: -51, Col1: 51, Col2: -305, Col3: 305
+
+Test Case 3: All Zeros
+Inputs: [0, 0, 0, 0]
+Expected Outputs: Col0: 0, Col1: 0, Col2: 0, Col3: 0
+Actual Outputs  : Col0: 0, Col1: 0, Col2: 0, Col3: 0
+
+===============================================================
+   Simulation Complete
+===============================================================
+- crossbar_tb.sv:123: Verilog $finish

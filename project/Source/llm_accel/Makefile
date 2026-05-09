@@ -19,6 +19,23 @@ ifeq ($(SINGLE_PASS), 1)
   CFLAGS += -DACCEL_SINGLE_PASS
 endif
 
+# ── Fused bias + GELU simulation ──────────────────────────────────────────────
+# make FUSED=1   — replace tanhf with Padé rational approximation in GELU,
+#                  modelling the accuracy impact of a hardware-fused bias+GELU
+#                  unit placed at the systolic array output.
+#                  Works with any BACKEND.  No Verilator link required.
+FUSED  ?= 0
+POLY5  ?= 0
+PADE32 ?= 0
+ifeq ($(FUSED), 1)
+  CFLAGS += -DACCEL_FUSED_BIAS_GELU
+  ifeq ($(POLY5), 1)
+    CFLAGS += -DACCEL_TANH_POLY5
+  else ifeq ($(PADE32), 1)
+    CFLAGS += -DACCEL_TANH_PADE32
+  endif
+endif
+
 # ── Arithmetic precision mode (software backend only) ─────────────────────────
 # make ACCEL_PREC=bf16_fp32   BF16 multiply, FP32 accumulate (default, matches RTL)
 # make ACCEL_PREC=bf16_bf16   BF16 multiply, BF16 accumulate

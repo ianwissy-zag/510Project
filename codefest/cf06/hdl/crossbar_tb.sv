@@ -1,6 +1,6 @@
 `timescale 1ns / 1ps
 
-module tb_mac_crossbar_4x4;
+module crossbar_tb;
 
     // Parameters
     localparam int INPUT_WIDTH = 8;
@@ -32,9 +32,9 @@ module tb_mac_crossbar_4x4;
         $display("===============================================================\n");
 
         // ----------------------------------------------------------------------
-        // Test Case 1: User Requested Inputs
+        // Test Case 1: Baseline
         // ----------------------------------------------------------------------
-        $display("Test Case 1: User Request");
+        $display("Test Case 1: Baseline");
         
         // Input Vector: [10, 20, 30, 40]
         acts_i[0] = 8'd10;

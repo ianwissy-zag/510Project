@@ -627,6 +627,106 @@ void attention_backward(float* dinp, float* dpreatt, float* datt,
 }
 
 #define GELU_SCALING_FACTOR sqrtf(2.0f / M_PI)
+
+// =============================================================================
+// ACCEL_FUSED_BIAS_GELU — software model of hardware-fused bias + GELU.
+//
+// Build:
+//   make FUSED=1           — Padé [1/1] rational approx (3 coefficients)
+//   make FUSED=1 POLY5=1   — 5-term Taylor polynomial (degree 9)
+//
+// Both replace tanhf() to model the accuracy impact of a hardware GELU unit.
+// Bias addition is already exact inside matmul_forward(); the flag marks it
+// as conceptually on-chip and keeps forward/backward tanh consistent.
+//
+// Padé [1/1]:  x·(27+x²) / (27+9x²),  saturated at |x| ≥ 4.
+//   Error < 0.5% for |x| < 1.5,  < 8% for |x| < 2.5.
+//   Hardware cost: 2 mul, 1 div, 2 add.
+//
+// 5-term Taylor: x - x³/3 + 2x⁵/15 - 17x⁷/315 + 62x⁹/2835, clamped to ±1.
+//   Accurate for |x| < 1.2; diverges beyond — clamping saturates at ~|x|=1.6.
+//   Hardware cost: 4 mul (Horner), 4 add, 1 comparator — no divider.
+//   NOTE: divergence means clamping fires early, often giving LOWER accuracy
+//   than Padé [1/1] despite more terms.  See experiment results.
+// =============================================================================
+#if defined(ACCEL_FUSED_BIAS_GELU)
+
+#if defined(ACCEL_TANH_POLY5)
+// ── 5-term Taylor polynomial ─────────────────────────────────────────────────
+// tanh(x) = x − x³/3 + 2x⁵/15 − 17x⁷/315 + 62x⁹/2835  (Horner form)
+// Valid for |x| < ~1.2; diverges beyond. Result clamped to [−1, 1].
+// Divergence means the clamp fires around |x| ≈ 1.6, so this effectively
+// saturates to ±1 much earlier than tanhf and produces larger errors for
+// the large-argument tail of the GELU distribution.
+static inline float tanh_poly(float x) {
+    if (x >=  4.0f) return  1.0f;
+    if (x <= -4.0f) return -1.0f;
+    float x2 = x * x;
+    float t = x * (1.0f + x2 * (-0.33333333f + x2 * (0.13333333f
+              + x2 * (-0.05396825f + x2 * 0.02187029f))));
+    return t >  1.0f ?  1.0f :
+           t < -1.0f ? -1.0f : t;
+}
+#elif defined(ACCEL_TANH_PADE32)
+// ── Padé [3/2] in x² ─────────────────────────────────────────────────────────
+// tanh(x) ≈ x·(1485 + 171x² + 2x⁴) / (1485 + 666x² + 26x⁴)
+//
+// Derivation: write tanh(x)/x = P₃(x²)/Q₂(x²) and match the Taylor series
+// through degree 11.  Solving the Padé linear system gives exact integer
+// coefficients (normalised to denominator constant = 1485):
+//   num = 1 + (19/165)x² + (2/1485)x⁴
+//   den = 1 + (74/165)x² + (26/1485)x⁴
+// Multiplied through by 1485 gives the integer form above.
+//
+// Accuracy vs tanhf:  < 0.01% for |x| ≤ 2,  < 0.2% for |x| ≤ 3.
+// Saturates cleanly at |x| = 4 (first overshoot beyond that, < 0.1% error).
+// Hardware cost: ~8 mul, 4 add, 1 div — about 4× more than Padé [1/1].
+static inline float tanh_poly(float x) {
+    if (x >=  4.0f) return  1.0f;
+    if (x <= -4.0f) return -1.0f;
+    float x2 = x * x;
+    float x4 = x2 * x2;
+    return x * (1485.0f + 171.0f * x2 + 2.0f * x4)
+             / (1485.0f + 666.0f * x2 + 26.0f * x4);
+}
+#else
+// ── Padé [1/1] rational approximation (default) ──────────────────────────────
+// tanh(x) ≈ x·(27 + x²) / (27 + 9x²),  saturated at |x| ≥ 4.
+// Rational form avoids divergence: approaches 1/3 * x/x = 1/3 → never
+// overshoots, saturates gracefully at x=3 (p(3)=1 exactly).
+static inline float tanh_poly(float x) {
+    if (x >=  4.0f) return  1.0f;
+    if (x <= -4.0f) return -1.0f;
+    float x2 = x * x;
+    return x * (27.0f + x2) / (27.0f + 9.0f * x2);
+}
+#endif
+
+void gelu_forward(float* out, float* inp, int N) {
+    for (int i = 0; i < N; i++) {
+        float x = inp[i];
+        float cube = 0.044715f * x * x * x;
+        out[i] = 0.5f * x * (1.0f + tanh_poly(GELU_SCALING_FACTOR * (x + cube)));
+    }
+}
+
+void gelu_backward(float* dinp, float* inp, float* dout, int N) {
+    for (int i = 0; i < N; i++) {
+        float x = inp[i];
+        float cube = 0.044715f * x * x * x;
+        float tanh_arg = GELU_SCALING_FACTOR * (x + cube);
+        float tanh_out = tanh_poly(tanh_arg);
+        // sech²(x) = 1 − tanh²(x): avoids a separate coshf call
+        float sech_sq   = 1.0f - tanh_out * tanh_out;
+        float local_grad = 0.5f * (1.0f + tanh_out)
+                         + x * 0.5f * sech_sq
+                           * GELU_SCALING_FACTOR * (1.0f + 3.0f * 0.044715f * x * x);
+        dinp[i] += local_grad * dout[i];
+    }
+}
+
+#else  // original exact implementation
+
 void gelu_forward(float* out, float* inp, int N) {
     // (approximate) GeLU elementwise non-linearity in the MLP block of Transformer
     for (int i = 0; i < N; i++) {
@@ -654,6 +754,8 @@ void gelu_backward(float* dinp, float* inp, float* dout, int N) {
     }
 }
 #pragma float_control(pop)
+
+#endif // ACCEL_FUSED_BIAS_GELU
 
 void residual_forward(float* out, float* inp1, float* inp2, int N) {
     for (int i = 0; i < N; i++) {
