@@ -59,10 +59,6 @@ set_db syn_opt_effort       high
 # gelu_unit also synthesised once, replicated across 32 column instances.
 set_db auto_ungroup         none
 
-# Enable retiming so Genus can pipeline the deeply combinational GELU path.
-# Without this the GELU readback path (~6ns) would fail the 1650ps target.
-set_db design:sys_top .retime true
-
 # ── Read libraries ────────────────────────────────────────────────────────────
 read_libs [list $lib_tt_simple $lib_tt_invbuf $lib_tt_seq $lib_tt_ao $lib_tt_oa]
 
@@ -96,9 +92,13 @@ read_hdl -sv               ../../HDL_Systolic_32x32/top.sv
 elaborate sys_top
 check_design -unresolved
 
+# Enable retiming after elaboration — design object must exist first.
+# Allows Genus to pipeline the ~6ns combinational GELU path to meet 1650ps.
+set_db [get_db designs sys_top] .retime true
+
 # ── Timing constraints ────────────────────────────────────────────────────────
 # 1650ps target on the systolic compute path (bf16_mac_unit critical path).
-# The GELU readback path is handled by retiming above.
+# The GELU readback path is pipelined automatically by retiming.
 read_sdc constraints.sdc
 
 # ── Synthesis ─────────────────────────────────────────────────────────────────
