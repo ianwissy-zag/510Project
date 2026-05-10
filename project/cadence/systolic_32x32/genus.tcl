@@ -50,9 +50,9 @@ set_db init_lib_search_path     $asap7_lib_dir
 set_db init_hdl_search_path     ../../HDL_Systolic_32x32
 
 # Higher effort needed: GELU retiming requires more optimisation passes.
-set_db syn_generic_effort   high
-set_db syn_map_effort       high
-set_db syn_opt_effort       high
+set_db syn_generic_effort   medium
+set_db syn_map_effort       medium
+set_db syn_opt_effort       medium
 
 # Hierarchical synthesis — pe (and its bf16_mac_unit) synthesised once,
 # replicated across all 32×32 = 1024 PE instances.
@@ -92,13 +92,10 @@ read_hdl -sv               ../../HDL_Systolic_32x32/top.sv
 elaborate sys_top
 check_design -unresolved
 
-# Enable retiming after elaboration — design object must exist first.
-# Allows Genus to pipeline the ~6ns combinational GELU path to meet 1650ps.
-set_db [get_db designs sys_top] .retime true
-
 # ── Timing constraints ────────────────────────────────────────────────────────
-# 1650ps target on the systolic compute path (bf16_mac_unit critical path).
-# The GELU readback path is pipelined automatically by retiming.
+# 1650ps target.  The GELU readback path is explicitly pipelined in RTL
+# (gelu_unit has 5 register banks, max 3 bf16_mul per stage ≈ 1350 ps).
+# No retiming directive needed — Genus treats each stage independently.
 read_sdc constraints.sdc
 
 # ── Synthesis ─────────────────────────────────────────────────────────────────

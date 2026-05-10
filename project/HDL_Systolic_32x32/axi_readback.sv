@@ -1,25 +1,35 @@
 `timescale 1ns / 1ps
 
-// AXI4-Stream readback with synthesisable bias addition and GELU.
+// AXI4-Stream readback with pipelined bias addition and GELU.
 //
-// Post-processing pipeline per output column (combinational):
-//   accum[m][c]  →  bf16_fp32_add(+bias[c])  →  gelu_unit  →  AXI beat
+// The gelu_unit has a 5-cycle pipeline latency.  A warmup counter runs for
+// GELU_LATENCY=5 cycles before the AXI output begins, feeding the SRAM
+// address sequence from 0 so that by the time the first beat is transmitted
+// the pipeline output is correctly aligned with M row 0.
 //
-// apply_bias : add bias[c] to each column before GELU/output
-// apply_gelu : apply GELU(Padé[3/2]) after bias
-// Both are latched at rb_start and held for the burst.
+// SRAM address sequence across the full readback (warmup + output):
+//   total_cnt 0,1  → addr=0  (warm-up, pipeline filling, tvalid=0)
+//   total_cnt 2,3  → addr=1  (warm-up)
+//   total_cnt 4    → addr=2  (warm-up, last cycle)
+//   total_cnt 5,6  → addr=0  (output beat 0,1  — gelu output = M row 0) ✓
+//   total_cnt 7,8  → addr=1  (output beat 2,3  — gelu output = M row 1) ✓
+//   ...
+//   total_cnt 5+2*(M-1), 5+2*(M-1)+1 → addr=M+1 (gelu output = M row M-1) ✓
 //
-// GELU uses gelu_unit.sv (bf16_mul + fp32_recip, fully synthesisable).
-// Bias uses bf16_fp32_add.sv (FP32+FP32 adder, already in the design).
+// Because the SRAM is combinational and all data was written before readback
+// starts, re-reading an address that was already presented during warm-up is
+// harmless — the result is identical.
 //
-// Beat structure: 2 beats per M row, 512 bits (16 FP32 values) each.
+// Total cycles per readback: GELU_LATENCY + 2 × M_count
+// HAL sees exactly 2 × M_count valid AXI beats (unchanged interface).
 
 module axi_readback #(
-    parameter COLS       = 32,
-    parameter PSUM_WIDTH = 32,
-    parameter AXI_WIDTH  = 512,
-    parameter M_MAX      = 256,
-    parameter M_ADDR_W   = $clog2(M_MAX + 1)
+    parameter COLS        = 32,
+    parameter PSUM_WIDTH  = 32,
+    parameter AXI_WIDTH   = 512,
+    parameter M_MAX       = 256,
+    parameter M_ADDR_W    = $clog2(M_MAX + 1),
+    parameter GELU_LATENCY = 5    // pipeline stages in gelu_unit
 )(
     input  logic clk,
     input  logic rst_n,
@@ -35,7 +45,7 @@ module axi_readback #(
     output logic [M_ADDR_W-1:0]        sram_addr,
     input  logic [COLS*PSUM_WIDTH-1:0] sram_rdata,
 
-    // bias_sram read port — all COLS values in parallel
+    // bias_sram read port
     input  logic [COLS-1:0][PSUM_WIDTH-1:0] bias_rdata,
 
     // AXI-S master
@@ -46,25 +56,33 @@ module axi_readback #(
 );
     localparam VALS_PER_BEAT = AXI_WIDTH / PSUM_WIDTH;  // 16
 
-    logic [M_ADDR_W:0] beat_cnt;
-    logic              running;
-    logic              rb_apply_bias, rb_apply_gelu;
+    // total_cnt spans warmup + output: 0 .. GELU_LATENCY + 2*M_count - 1
+    // Use a wide enough counter: M_ADDR_W+1 bits for 2*M_count, plus log2(LATENCY)
+    localparam CNT_W = M_ADDR_W + 4;  // sufficient for 5 + 2*256 = 517
 
-    assign sram_addr = beat_cnt[M_ADDR_W:1];
+    logic [CNT_W-1:0] total_cnt;
+    logic             running;
+    logic             rb_apply_bias, rb_apply_gelu;
+
+    // Effective latency: GELU_LATENCY when GELU is active, 0 otherwise.
+    // This keeps the non-GELU path latency-free while still pre-feeding the
+    // pipeline when GELU is enabled.
+    logic [CNT_W-1:0] lat;
+    assign lat = rb_apply_gelu ? CNT_W'(GELU_LATENCY) : '0;
+
+    // SRAM address: driven by total_cnt so pipeline is filled LATENCY cycles
+    // before the first valid AXI beat.
+    assign sram_addr = total_cnt[M_ADDR_W:1];
+
+    // Output-relative counter: 0 on the first AXI beat regardless of warmup.
+    // Using this for beat_sel keeps lower/upper half parity always correct.
+    logic [CNT_W-1:0] out_cnt;
+    assign out_cnt  = total_cnt - lat;
+
     logic beat_sel;
-    assign beat_sel = beat_cnt[0];
+    assign beat_sel = out_cnt[0];
 
     // ── Per-column post-processing ────────────────────────────────────────────
-    // For each of the COLS=32 output columns:
-    //   raw      = accum_sram value for this column
-    //   biased   = raw + bias[c]          (always computed, muxed on apply_bias)
-    //   gelu_in  = biased or raw          (selected by apply_bias flag)
-    //   gelu_out = GELU(gelu_in)          (always computed, muxed on apply_gelu)
-    //   processed = gelu_out or gelu_in   (selected by apply_gelu flag)
-    //
-    // All arithmetic modules are combinational — synthesis adds registers
-    // for timing closure as needed.
-
     logic [COLS-1:0][PSUM_WIDTH-1:0] processed;
 
     genvar c;
@@ -72,25 +90,17 @@ module axi_readback #(
         for (c = 0; c < COLS; c++) begin : g_postproc
             logic [PSUM_WIDTH-1:0] raw, biased_val, gelu_in, gelu_out;
 
-            assign raw = sram_rdata[c*PSUM_WIDTH +: PSUM_WIDTH];
+            assign raw     = sram_rdata[c*PSUM_WIDTH +: PSUM_WIDTH];
 
-            // Bias: FP32 addition using existing bf16_fp32_add
             bf16_fp32_add u_bias (
-                .a(raw),
-                .b(bias_rdata[c]),
-                .result(biased_val)
-            );
+                .a(raw), .b(bias_rdata[c]), .result(biased_val));
 
-            // Select GELU input based on apply_bias
             assign gelu_in = rb_apply_bias ? biased_val : raw;
 
-            // GELU: Padé [3/2] approximation, fully synthesisable
             gelu_unit u_gelu (
-                .x(gelu_in),
-                .result(gelu_out)
-            );
+                .clk(clk), .rst(~rst_n),   // gelu_unit uses active-high rst
+                .x(gelu_in), .result(gelu_out));
 
-            // Output select
             assign processed[c] = rb_apply_gelu ? gelu_out : gelu_in;
         end
     endgenerate
@@ -104,29 +114,37 @@ module axi_readback #(
         end
     endgenerate
 
-    logic [M_ADDR_W:0] total_beats;
-    assign total_beats = {M_count, 1'b0};
+    // ── Timing control ────────────────────────────────────────────────────────
+    logic [CNT_W-1:0] total_beats;
+    assign total_beats = lat + {M_count, 1'b0};  // warmup + 2*M_count
 
-    assign m_axis_tvalid = running;
-    assign m_axis_tlast  = running && (beat_cnt == total_beats - 1'b1);
+    logic in_warmup;
+    assign in_warmup = (total_cnt < lat);
+
+    assign m_axis_tvalid = running && !in_warmup;
+    assign m_axis_tlast  = running && !in_warmup &&
+                           (total_cnt == total_beats - 1'b1);
     assign busy          = running;
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             running       <= 1'b0;
-            beat_cnt      <= '0;
+            total_cnt     <= '0;
             rb_apply_bias <= 1'b0;
             rb_apply_gelu <= 1'b0;
         end else if (!running && start) begin
             running       <= 1'b1;
-            beat_cnt      <= '0;
+            total_cnt     <= '0;
             rb_apply_bias <= apply_bias;
             rb_apply_gelu <= apply_gelu;
-        end else if (running && m_axis_tready) begin
-            if (beat_cnt == total_beats - 1'b1)
-                running <= 1'b0;
-            else
-                beat_cnt <= beat_cnt + 1'b1;
+        end else if (running) begin
+            // Advance on every cycle during warmup; on tready during output.
+            if (in_warmup || m_axis_tready) begin
+                if (total_cnt == total_beats - 1'b1)
+                    running <= 1'b0;
+                else
+                    total_cnt <= total_cnt + 1'b1;
+            end
         end
     end
 endmodule
