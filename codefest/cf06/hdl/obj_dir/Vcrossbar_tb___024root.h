@@ -23,9 +23,9 @@ class alignas(VL_CACHE_LINE_BYTES) Vcrossbar_tb___024root final : public Verilat
     CData/*0:0*/ __VactContinue;
     IData/*31:0*/ __VactIterCount;
     VlUnpacked<CData/*7:0*/, 4> crossbar_tb__DOT__acts_i;
-    VlUnpacked<SData/*9:0*/, 4> crossbar_tb__DOT__mac_outs_o;
+    VlUnpacked<CData/*7:0*/, 4> crossbar_tb__DOT__mac_outs_o;
     VlUnpacked<VlUnpacked<SData/*8:0*/, 4>, 4> crossbar_tb__DOT__dut__DOT__mult_results;
-    VlUnpacked<SData/*9:0*/, 4> crossbar_tb__DOT__dut__DOT__col_sum;
+    VlUnpacked<SData/*10:0*/, 4> crossbar_tb__DOT__dut__DOT__col_sum;
     VlDelayScheduler __VdlySched;
     VlTriggerScheduler __VtrigSched_h99f9162d__0;
     VlTriggerVec<1> __VstlTriggered;

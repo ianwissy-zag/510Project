@@ -55,10 +55,10 @@ VL_INLINE_OPT VlCoroutine Vcrossbar_tb___024root___eval_initial__TOP__Vtiming__0
               8,vlSelf->crossbar_tb__DOT__acts_i[1U],
               8,vlSelf->crossbar_tb__DOT__acts_i[2U],
               8,vlSelf->crossbar_tb__DOT__acts_i[3U],
-              10,vlSelf->crossbar_tb__DOT__mac_outs_o
-              [0U],10,vlSelf->crossbar_tb__DOT__mac_outs_o
-              [1U],10,vlSelf->crossbar_tb__DOT__mac_outs_o
-              [2U],10,vlSelf->crossbar_tb__DOT__mac_outs_o
+              8,vlSelf->crossbar_tb__DOT__mac_outs_o
+              [0U],8,vlSelf->crossbar_tb__DOT__mac_outs_o
+              [1U],8,vlSelf->crossbar_tb__DOT__mac_outs_o
+              [2U],8,vlSelf->crossbar_tb__DOT__mac_outs_o
               [3U]);
     vlSelf->crossbar_tb__DOT__acts_i[0U] = 0x80U;
     vlSelf->crossbar_tb__DOT__acts_i[1U] = 0x7fU;
@@ -73,15 +73,15 @@ VL_INLINE_OPT VlCoroutine Vcrossbar_tb___024root___eval_initial__TOP__Vtiming__0
     co_await vlSelf->__VdlySched.delay(0x3e8ULL, nullptr, 
                                        "crossbar_tb.sv", 
                                        106);
-    VL_WRITEF("Inputs: [%0d, %0d, %0d, %0d]\nExpected Outputs: Col0: -51, Col1: 51, Col2: -305, Col3: 305\nActual Outputs  : Col0: %0d, Col1: %0d, Col2: %0d, Col3: %0d\n\nTest Case 3: All Zeros\n",
+    VL_WRITEF("Inputs: [%0d, %0d, %0d, %0d]\nExpected Outputs: Col0: -51, Col1: 51, Col2: -49, Col3: 49  (Col2/3 overflow)\nActual Outputs  : Col0: %0d, Col1: %0d, Col2: %0d, Col3: %0d\n\nTest Case 3: All Zeros\n",
               8,vlSelf->crossbar_tb__DOT__acts_i[0U],
               8,vlSelf->crossbar_tb__DOT__acts_i[1U],
               8,vlSelf->crossbar_tb__DOT__acts_i[2U],
               8,vlSelf->crossbar_tb__DOT__acts_i[3U],
-              10,vlSelf->crossbar_tb__DOT__mac_outs_o
-              [0U],10,vlSelf->crossbar_tb__DOT__mac_outs_o
-              [1U],10,vlSelf->crossbar_tb__DOT__mac_outs_o
-              [2U],10,vlSelf->crossbar_tb__DOT__mac_outs_o
+              8,vlSelf->crossbar_tb__DOT__mac_outs_o
+              [0U],8,vlSelf->crossbar_tb__DOT__mac_outs_o
+              [1U],8,vlSelf->crossbar_tb__DOT__mac_outs_o
+              [2U],8,vlSelf->crossbar_tb__DOT__mac_outs_o
               [3U]);
     vlSelf->crossbar_tb__DOT__acts_i[0U] = 0U;
     vlSelf->crossbar_tb__DOT__acts_i[1U] = 0U;
@@ -92,19 +92,19 @@ VL_INLINE_OPT VlCoroutine Vcrossbar_tb___024root___eval_initial__TOP__Vtiming__0
                                                        nullptr, 
                                                        "@(posedge crossbar_tb.clk)", 
                                                        "crossbar_tb.sv", 
-                                                       128);
+                                                       130);
     co_await vlSelf->__VdlySched.delay(0x3e8ULL, nullptr, 
                                        "crossbar_tb.sv", 
-                                       129);
+                                       131);
     VL_WRITEF("Inputs: [%0d, %0d, %0d, %0d]\nExpected Outputs: Col0: 0, Col1: 0, Col2: 0, Col3: 0\nActual Outputs  : Col0: %0d, Col1: %0d, Col2: %0d, Col3: %0d\n\nTest Case 4: Synchronous reset clears outputs\n",
               8,vlSelf->crossbar_tb__DOT__acts_i[0U],
               8,vlSelf->crossbar_tb__DOT__acts_i[1U],
               8,vlSelf->crossbar_tb__DOT__acts_i[2U],
               8,vlSelf->crossbar_tb__DOT__acts_i[3U],
-              10,vlSelf->crossbar_tb__DOT__mac_outs_o
-              [0U],10,vlSelf->crossbar_tb__DOT__mac_outs_o
-              [1U],10,vlSelf->crossbar_tb__DOT__mac_outs_o
-              [2U],10,vlSelf->crossbar_tb__DOT__mac_outs_o
+              8,vlSelf->crossbar_tb__DOT__mac_outs_o
+              [0U],8,vlSelf->crossbar_tb__DOT__mac_outs_o
+              [1U],8,vlSelf->crossbar_tb__DOT__mac_outs_o
+              [2U],8,vlSelf->crossbar_tb__DOT__mac_outs_o
               [3U]);
     vlSelf->crossbar_tb__DOT__acts_i[0U] = 5U;
     vlSelf->crossbar_tb__DOT__acts_i[1U] = 5U;
@@ -115,34 +115,34 @@ VL_INLINE_OPT VlCoroutine Vcrossbar_tb___024root___eval_initial__TOP__Vtiming__0
                                                        nullptr, 
                                                        "@(posedge crossbar_tb.clk)", 
                                                        "crossbar_tb.sv", 
-                                                       145);
+                                                       147);
     co_await vlSelf->__VdlySched.delay(0x3e8ULL, nullptr, 
                                        "crossbar_tb.sv", 
-                                       146);
+                                       148);
     VL_WRITEF("Before reset \342\200\224 Actual Outputs: Col0: %0d, Col1: %0d, Col2: %0d, Col3: %0d\n",
-              10,vlSelf->crossbar_tb__DOT__mac_outs_o
-              [0U],10,vlSelf->crossbar_tb__DOT__mac_outs_o
-              [1U],10,vlSelf->crossbar_tb__DOT__mac_outs_o
-              [2U],10,vlSelf->crossbar_tb__DOT__mac_outs_o
+              8,vlSelf->crossbar_tb__DOT__mac_outs_o
+              [0U],8,vlSelf->crossbar_tb__DOT__mac_outs_o
+              [1U],8,vlSelf->crossbar_tb__DOT__mac_outs_o
+              [2U],8,vlSelf->crossbar_tb__DOT__mac_outs_o
               [3U]);
     vlSelf->crossbar_tb__DOT__rst = 1U;
     co_await vlSelf->__VtrigSched_h99f9162d__0.trigger(0U, 
                                                        nullptr, 
                                                        "@(posedge crossbar_tb.clk)", 
                                                        "crossbar_tb.sv", 
-                                                       151);
+                                                       153);
     co_await vlSelf->__VdlySched.delay(0x3e8ULL, nullptr, 
                                        "crossbar_tb.sv", 
-                                       152);
+                                       154);
     VL_WRITEF("After  reset \342\200\224 Expected: 0,0,0,0  Actual: Col0: %0d, Col1: %0d, Col2: %0d, Col3: %0d\n\n",
-              10,vlSelf->crossbar_tb__DOT__mac_outs_o
-              [0U],10,vlSelf->crossbar_tb__DOT__mac_outs_o
-              [1U],10,vlSelf->crossbar_tb__DOT__mac_outs_o
-              [2U],10,vlSelf->crossbar_tb__DOT__mac_outs_o
+              8,vlSelf->crossbar_tb__DOT__mac_outs_o
+              [0U],8,vlSelf->crossbar_tb__DOT__mac_outs_o
+              [1U],8,vlSelf->crossbar_tb__DOT__mac_outs_o
+              [2U],8,vlSelf->crossbar_tb__DOT__mac_outs_o
               [3U]);
     vlSelf->crossbar_tb__DOT__rst = 0U;
     VL_WRITEF("===============================================================\n   Simulation Complete\n===============================================================\n");
-    VL_FINISH_MT("crossbar_tb.sv", 161, "");
+    VL_FINISH_MT("crossbar_tb.sv", 163, "");
 }
 
 #ifdef VL_DEBUG

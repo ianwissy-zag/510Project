@@ -137,44 +137,44 @@ VL_INLINE_OPT void Vcrossbar_tb___024root___act_comb__TOP__0(Vcrossbar_tb___024r
                                                                 vlSelf->crossbar_tb__DOT__acts_i
                                                                 [3U])));
     vlSelf->crossbar_tb__DOT__dut__DOT__col_sum[0U] 
-        = (0x3ffU & (((VL_EXTENDS_II(10,9, vlSelf->crossbar_tb__DOT__dut__DOT__mult_results
-                                     [0U][0U]) + VL_EXTENDS_II(10,9, 
+        = (0x7ffU & (((VL_EXTENDS_II(11,9, vlSelf->crossbar_tb__DOT__dut__DOT__mult_results
+                                     [0U][0U]) + VL_EXTENDS_II(11,9, 
                                                                vlSelf->crossbar_tb__DOT__dut__DOT__mult_results
                                                                [1U]
                                                                [0U])) 
-                      + VL_EXTENDS_II(10,9, vlSelf->crossbar_tb__DOT__dut__DOT__mult_results
+                      + VL_EXTENDS_II(11,9, vlSelf->crossbar_tb__DOT__dut__DOT__mult_results
                                       [2U][0U])) + 
-                     VL_EXTENDS_II(10,9, vlSelf->crossbar_tb__DOT__dut__DOT__mult_results
+                     VL_EXTENDS_II(11,9, vlSelf->crossbar_tb__DOT__dut__DOT__mult_results
                                    [3U][0U])));
     vlSelf->crossbar_tb__DOT__dut__DOT__col_sum[1U] 
-        = (0x3ffU & (((VL_EXTENDS_II(10,9, vlSelf->crossbar_tb__DOT__dut__DOT__mult_results
-                                     [0U][1U]) + VL_EXTENDS_II(10,9, 
+        = (0x7ffU & (((VL_EXTENDS_II(11,9, vlSelf->crossbar_tb__DOT__dut__DOT__mult_results
+                                     [0U][1U]) + VL_EXTENDS_II(11,9, 
                                                                vlSelf->crossbar_tb__DOT__dut__DOT__mult_results
                                                                [1U]
                                                                [1U])) 
-                      + VL_EXTENDS_II(10,9, vlSelf->crossbar_tb__DOT__dut__DOT__mult_results
+                      + VL_EXTENDS_II(11,9, vlSelf->crossbar_tb__DOT__dut__DOT__mult_results
                                       [2U][1U])) + 
-                     VL_EXTENDS_II(10,9, vlSelf->crossbar_tb__DOT__dut__DOT__mult_results
+                     VL_EXTENDS_II(11,9, vlSelf->crossbar_tb__DOT__dut__DOT__mult_results
                                    [3U][1U])));
     vlSelf->crossbar_tb__DOT__dut__DOT__col_sum[2U] 
-        = (0x3ffU & (((VL_EXTENDS_II(10,9, vlSelf->crossbar_tb__DOT__dut__DOT__mult_results
-                                     [0U][2U]) + VL_EXTENDS_II(10,9, 
+        = (0x7ffU & (((VL_EXTENDS_II(11,9, vlSelf->crossbar_tb__DOT__dut__DOT__mult_results
+                                     [0U][2U]) + VL_EXTENDS_II(11,9, 
                                                                vlSelf->crossbar_tb__DOT__dut__DOT__mult_results
                                                                [1U]
                                                                [2U])) 
-                      + VL_EXTENDS_II(10,9, vlSelf->crossbar_tb__DOT__dut__DOT__mult_results
+                      + VL_EXTENDS_II(11,9, vlSelf->crossbar_tb__DOT__dut__DOT__mult_results
                                       [2U][2U])) + 
-                     VL_EXTENDS_II(10,9, vlSelf->crossbar_tb__DOT__dut__DOT__mult_results
+                     VL_EXTENDS_II(11,9, vlSelf->crossbar_tb__DOT__dut__DOT__mult_results
                                    [3U][2U])));
     vlSelf->crossbar_tb__DOT__dut__DOT__col_sum[3U] 
-        = (0x3ffU & (((VL_EXTENDS_II(10,9, vlSelf->crossbar_tb__DOT__dut__DOT__mult_results
-                                     [0U][3U]) + VL_EXTENDS_II(10,9, 
+        = (0x7ffU & (((VL_EXTENDS_II(11,9, vlSelf->crossbar_tb__DOT__dut__DOT__mult_results
+                                     [0U][3U]) + VL_EXTENDS_II(11,9, 
                                                                vlSelf->crossbar_tb__DOT__dut__DOT__mult_results
                                                                [1U]
                                                                [3U])) 
-                      + VL_EXTENDS_II(10,9, vlSelf->crossbar_tb__DOT__dut__DOT__mult_results
+                      + VL_EXTENDS_II(11,9, vlSelf->crossbar_tb__DOT__dut__DOT__mult_results
                                       [2U][3U])) + 
-                     VL_EXTENDS_II(10,9, vlSelf->crossbar_tb__DOT__dut__DOT__mult_results
+                     VL_EXTENDS_II(11,9, vlSelf->crossbar_tb__DOT__dut__DOT__mult_results
                                    [3U][3U])));
 }
 
@@ -195,15 +195,15 @@ VL_INLINE_OPT void Vcrossbar_tb___024root___nba_sequent__TOP__0(Vcrossbar_tb___0
     // Init
     CData/*0:0*/ __Vdlyvset__crossbar_tb__DOT__mac_outs_o__v0;
     __Vdlyvset__crossbar_tb__DOT__mac_outs_o__v0 = 0;
-    SData/*9:0*/ __Vdlyvval__crossbar_tb__DOT__mac_outs_o__v4;
+    CData/*7:0*/ __Vdlyvval__crossbar_tb__DOT__mac_outs_o__v4;
     __Vdlyvval__crossbar_tb__DOT__mac_outs_o__v4 = 0;
     CData/*0:0*/ __Vdlyvset__crossbar_tb__DOT__mac_outs_o__v4;
     __Vdlyvset__crossbar_tb__DOT__mac_outs_o__v4 = 0;
-    SData/*9:0*/ __Vdlyvval__crossbar_tb__DOT__mac_outs_o__v5;
+    CData/*7:0*/ __Vdlyvval__crossbar_tb__DOT__mac_outs_o__v5;
     __Vdlyvval__crossbar_tb__DOT__mac_outs_o__v5 = 0;
-    SData/*9:0*/ __Vdlyvval__crossbar_tb__DOT__mac_outs_o__v6;
+    CData/*7:0*/ __Vdlyvval__crossbar_tb__DOT__mac_outs_o__v6;
     __Vdlyvval__crossbar_tb__DOT__mac_outs_o__v6 = 0;
-    SData/*9:0*/ __Vdlyvval__crossbar_tb__DOT__mac_outs_o__v7;
+    CData/*7:0*/ __Vdlyvval__crossbar_tb__DOT__mac_outs_o__v7;
     __Vdlyvval__crossbar_tb__DOT__mac_outs_o__v7 = 0;
     // Body
     __Vdlyvset__crossbar_tb__DOT__mac_outs_o__v0 = 0U;
@@ -212,18 +212,18 @@ VL_INLINE_OPT void Vcrossbar_tb___024root___nba_sequent__TOP__0(Vcrossbar_tb___0
         __Vdlyvset__crossbar_tb__DOT__mac_outs_o__v0 = 1U;
     } else {
         __Vdlyvval__crossbar_tb__DOT__mac_outs_o__v4 
-            = vlSelf->crossbar_tb__DOT__dut__DOT__col_sum
-            [0U];
+            = (0xffU & vlSelf->crossbar_tb__DOT__dut__DOT__col_sum
+               [0U]);
         __Vdlyvset__crossbar_tb__DOT__mac_outs_o__v4 = 1U;
         __Vdlyvval__crossbar_tb__DOT__mac_outs_o__v5 
-            = vlSelf->crossbar_tb__DOT__dut__DOT__col_sum
-            [1U];
+            = (0xffU & vlSelf->crossbar_tb__DOT__dut__DOT__col_sum
+               [1U]);
         __Vdlyvval__crossbar_tb__DOT__mac_outs_o__v6 
-            = vlSelf->crossbar_tb__DOT__dut__DOT__col_sum
-            [2U];
+            = (0xffU & vlSelf->crossbar_tb__DOT__dut__DOT__col_sum
+               [2U]);
         __Vdlyvval__crossbar_tb__DOT__mac_outs_o__v7 
-            = vlSelf->crossbar_tb__DOT__dut__DOT__col_sum
-            [3U];
+            = (0xffU & vlSelf->crossbar_tb__DOT__dut__DOT__col_sum
+               [3U]);
     }
     if (__Vdlyvset__crossbar_tb__DOT__mac_outs_o__v0) {
         vlSelf->crossbar_tb__DOT__mac_outs_o[0U] = 0U;

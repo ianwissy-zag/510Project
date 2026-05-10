@@ -4,7 +4,7 @@ module crossbar_tb;
 
     // Parameters
     localparam int INPUT_WIDTH  = 8;
-    localparam int OUTPUT_WIDTH = INPUT_WIDTH + 2;
+    localparam int OUTPUT_WIDTH = INPUT_WIDTH;   // outputs same width as inputs; overflow wraps
     localparam     CLK_PERIOD   = 10; // ns
 
     // Clock and reset
@@ -106,7 +106,9 @@ module crossbar_tb;
         #1;
         $display("Inputs: [%0d, %0d, %0d, %0d]",
                  acts_i[0], acts_i[1], acts_i[2], acts_i[3]);
-        $display("Expected Outputs: Col0: -51, Col1: 51, Col2: -305, Col3: 305");
+        // Col2 = -128-127-50+0 = -305 → wraps to -49 in 8-bit signed (-305+256=-49)
+        // Col3 = +128+127+50+0 = +305 → wraps to +49 in 8-bit signed (305-256=49)
+        $display("Expected Outputs: Col0: -51, Col1: 51, Col2: -49, Col3: 49  (Col2/3 overflow)");
         $display("Actual Outputs  : Col0: %0d, Col1: %0d, Col2: %0d, Col3: %0d\n",
                  mac_outs_o[0], mac_outs_o[1], mac_outs_o[2], mac_outs_o[3]);
 

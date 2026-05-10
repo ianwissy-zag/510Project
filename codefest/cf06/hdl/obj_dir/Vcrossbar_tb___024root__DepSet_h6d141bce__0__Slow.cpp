@@ -149,7 +149,7 @@ VL_ATTR_COLD void Vcrossbar_tb___024root___ctor_var_reset(Vcrossbar_tb___024root
     }
     vlSelf->crossbar_tb__DOT__weights_i = VL_RAND_RESET_I(16);
     for (int __Vi0 = 0; __Vi0 < 4; ++__Vi0) {
-        vlSelf->crossbar_tb__DOT__mac_outs_o[__Vi0] = VL_RAND_RESET_I(10);
+        vlSelf->crossbar_tb__DOT__mac_outs_o[__Vi0] = VL_RAND_RESET_I(8);
     }
     for (int __Vi0 = 0; __Vi0 < 4; ++__Vi0) {
         for (int __Vi1 = 0; __Vi1 < 4; ++__Vi1) {
@@ -157,7 +157,7 @@ VL_ATTR_COLD void Vcrossbar_tb___024root___ctor_var_reset(Vcrossbar_tb___024root
         }
     }
     for (int __Vi0 = 0; __Vi0 < 4; ++__Vi0) {
-        vlSelf->crossbar_tb__DOT__dut__DOT__col_sum[__Vi0] = VL_RAND_RESET_I(10);
+        vlSelf->crossbar_tb__DOT__dut__DOT__col_sum[__Vi0] = VL_RAND_RESET_I(11);
     }
     vlSelf->__Vtrigprevexpr___TOP__crossbar_tb__DOT__clk__0 = VL_RAND_RESET_I(1);
 }

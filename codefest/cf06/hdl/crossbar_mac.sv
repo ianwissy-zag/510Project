@@ -1,9 +1,9 @@
 `timescale 1ns / 1ps
 
 module crossbar_mac #(
-    parameter int INPUT_WIDTH = 8,
-    // Add 2 bits to output width to prevent overflow when summing 4 rows (log2(4) = 2)
-    parameter int OUTPUT_WIDTH = INPUT_WIDTH + 2
+    parameter int INPUT_WIDTH  = 8,
+    // Output is same width as input — results wrap on overflow (modular arithmetic).
+    parameter int OUTPUT_WIDTH = INPUT_WIDTH
 )(
     input  logic clk,
     input  logic rst,   // synchronous active-high reset
@@ -19,10 +19,15 @@ module crossbar_mac #(
     output logic signed [OUTPUT_WIDTH-1:0] mac_outs_o [3:0]
 );
 
-    // Intermediate array to hold the result of activation * weight at each cross-point
-    // Note: We use INPUT_WIDTH + 1 bits here. If an 8-bit input is -128, 
-    // multiplying it by -1 gives +128, which requires 9 bits to represent in signed logic.
+    // Intermediate multiply results: INPUT_WIDTH+1 bits so that negating -128
+    // produces +128 without overflow (9 bits for INPUT_WIDTH=8).
     logic signed [INPUT_WIDTH:0] mult_results [3:0][3:0];
+
+    // Column sums: wide enough to hold 4 × (INPUT_WIDTH+1)-bit values exactly
+    // before truncation to OUTPUT_WIDTH.  For INPUT_WIDTH=8: 11 bits covers
+    // the full range [-512, 512].  The lower OUTPUT_WIDTH bits are then
+    // captured in the output register, producing natural 8-bit wrap-around.
+    logic signed [INPUT_WIDTH+2:0] col_sum [3:0];
 
     // ==============================================================================
     // 1. Parallel Multiplication Stage (Cross-point intersections)
@@ -45,10 +50,8 @@ module crossbar_mac #(
     endgenerate
 
     // ==============================================================================
-    // 2. Combinational Accumulation Stage (Column summation)
+    // 2. Combinational Accumulation Stage (Column summation — full precision)
     // ==============================================================================
-    logic signed [OUTPUT_WIDTH-1:0] col_sum [3:0];
-
     genvar c;
     generate
         for (c = 0; c < 4; c++) begin : gen_accum
@@ -63,6 +66,7 @@ module crossbar_mac #(
 
     // ==============================================================================
     // 3. Output Register with Synchronous Reset
+    //    Truncates col_sum to OUTPUT_WIDTH bits — overflow wraps (modular).
     // ==============================================================================
     always_ff @(posedge clk) begin
         if (rst) begin
@@ -70,7 +74,7 @@ module crossbar_mac #(
                 mac_outs_o[i] <= '0;
         end else begin
             for (int i = 0; i < 4; i++)
-                mac_outs_o[i] <= col_sum[i];
+                mac_outs_o[i] <= col_sum[i][OUTPUT_WIDTH-1:0];
         end
     end
 
