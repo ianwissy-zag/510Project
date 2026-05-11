@@ -29,7 +29,7 @@ module axi_readback #(
     parameter AXI_WIDTH   = 512,
     parameter M_MAX       = 256,
     parameter M_ADDR_W    = $clog2(M_MAX + 1),
-    parameter GELU_LATENCY = 5    // pipeline stages in gelu_unit
+    parameter GELU_LATENCY = 8    // pipeline register banks in gelu_unit
 )(
     input  logic clk,
     input  logic rst_n,
