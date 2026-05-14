@@ -29,7 +29,7 @@ module axi_readback #(
     parameter AXI_WIDTH   = 512,
     parameter M_MAX       = 256,
     parameter M_ADDR_W    = $clog2(M_MAX + 1),
-    parameter GELU_LATENCY = 8    // pipeline register banks in gelu_unit
+    parameter GELU_LATENCY = 9    // 8 gelu_unit banks + 1 input pre-register
 )(
     input  logic clk,
     input  logic rst_n,
@@ -97,9 +97,18 @@ module axi_readback #(
 
             assign gelu_in = rb_apply_bias ? biased_val : raw;
 
+            // Register gelu_in to break the SRAM+bias+x2+x3 critical path.
+            // Without this register the path is ~1800 ps (violates 1650 ps).
+            // With it: SRAM+bias → reg (~1200 ps) and reg→x2→x3→R0 (~600 ps).
+            logic [PSUM_WIDTH-1:0] gelu_in_r;
+            always_ff @(posedge clk or negedge rst_n) begin
+                if (!rst_n) gelu_in_r <= '0;
+                else        gelu_in_r <= gelu_in;
+            end
+
             gelu_unit u_gelu (
-                .clk(clk), .rst(~rst_n),   // gelu_unit uses active-high rst
-                .x(gelu_in), .result(gelu_out));
+                .clk(clk), .rst(~rst_n),
+                .x(gelu_in_r), .result(gelu_out));
 
             assign processed[c] = rb_apply_gelu ? gelu_out : gelu_in;
         end
