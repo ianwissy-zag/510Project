@@ -1,21 +1,21 @@
 `timescale 1ns / 1ps
 
-// 16-row × 32-column BF16 weight-stationary systolic array.
+// 32-row × 32-column BF16 weight-stationary systolic array.
 // Broadcast activation topology: act_in[r] is broadcast to ALL columns
 // in row r simultaneously — no horizontal propagation delay.
 //
-// During LOAD_WT (2×ROWS = 32 cycles):
-//   wt_in[col] enters PE[0][col] and shifts down. The 2-register depth
-//   (weight_reg + w_out) requires 2×ROWS cycles to fully fill all rows.
+// During LOAD_WT (ROWS cycles):
+//   wt_in[col] enters PE[0][col] and shifts down one row per cycle.
+//   After ROWS cycles all rows hold their weights.
 //
-// During COMPUTE (ROWS = 16 cycles):
+// During COMPUTE (ROWS cycles):
 //   psum flows top-to-bottom. All PEs in a row fire simultaneously.
 //   After ROWS cycles, PE[ROWS-1][col] has the full K_DEPTH inner product.
 //
 // Reset: asynchronous active-low.
 
-module systolic_16x32 #(
-    parameter ROWS   = 16,
+module systolic_32x32 #(
+    parameter ROWS   = 32,
     parameter COLS   = 32,
     parameter ACT_W  = 16,
     parameter WT_W   = 16,

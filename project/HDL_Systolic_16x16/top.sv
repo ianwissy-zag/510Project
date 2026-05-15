@@ -1,9 +1,9 @@
 `timescale 1ns / 1ps
 
-// Top-level: 32×32 BF16 weight-stationary systolic accelerator
+// Top-level: 16×16 BF16 weight-stationary systolic accelerator
 //            with fused bias addition and GELU (Padé [3/2]) post-processing.
 //
-// Streaming dataflow (HDL_Systolic_32x32, with bias+GELU post-processing):
+// Streaming dataflow (HDL_Systolic_16x16, with bias+GELU post-processing):
 //   1. Load weight tile (ROWS beats, tuser=000/001).
 //   2. Optionally load bias (2 beats, tuser=110).
 //   3. Assert start with M_count.
@@ -14,14 +14,14 @@
 // AXI tuser encoding:
 //   3'b000/001 = forward weight ping/pong
 //   3'b010/011 = backward weight ping/pong
-//   3'b100     = activation (one beat per M row, full 512 bits used)
-//   3'b110     = bias (2 beats: beat 0 → bias[0..15], beat 1 → bias[16..31])
+//   3'b100     = activation (one beat per M row, full 256 bits used)
+//   3'b110     = bias (2 beats: beat 0 → bias[0..7], beat 1 → bias[8..15])
 
 module sys_top #(
-    parameter AXI_WIDTH  = 512,
+    parameter AXI_WIDTH  = 256,
     parameter TUSER_W    = 3,
-    parameter ROWS       = 32,
-    parameter COLS       = 32,
+    parameter ROWS       = 16,
+    parameter COLS       = 16,
     parameter ACT_WIDTH  = 16,
     parameter WT_WIDTH   = 16,
     parameter PSUM_WIDTH = 32,
@@ -146,7 +146,7 @@ module sys_top #(
     assign act_in = stagger_out_packed;
 
     // ── Systolic array ────────────────────────────────────────────────────────
-    systolic_32x32 #(.ROWS(ROWS),.COLS(COLS),
+    systolic_16x16 #(.ROWS(ROWS),.COLS(COLS),
                      .ACT_W(ACT_WIDTH),.WT_W(WT_WIDTH),.PSUM_W(PSUM_WIDTH))
     u_array (
         .clk(clk), .rst_n(rst_n), .load_wt(load_wt),

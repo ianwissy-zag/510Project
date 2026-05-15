@@ -1,6 +1,6 @@
 `timescale 1ns / 1ps
 
-// Controller for the 32×32 BF16 systolic accelerator — streaming M-row mode.
+// Controller for the 16×16 BF16 systolic accelerator — streaming M-row mode.
 //
 // State machine: IDLE → LOAD_WT → STREAM → DONE
 //

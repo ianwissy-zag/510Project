@@ -1,6 +1,6 @@
 `timescale 1ns / 1ps
 
-// Processing element for the 32×32 BF16 systolic array.
+// Processing element for the 16×16 BF16 systolic array.
 //
 // Weight-stationary: weight_reg holds the BF16 weight for this PE.
 // During LOAD_WT: weights shift top-to-bottom through w_in/w_out.

@@ -2,7 +2,7 @@ VERILATOR  ?= verilator
 VFLAGS      = --cc --exe --build -sv --Wno-fatal --Wno-WIDTH
 VFLAGS_LIB  = --cc        --build -sv --Wno-fatal --Wno-WIDTH
 
-RTL_SRCS = top.sv axi.sv systolic_32x32.sv pe.sv \
+RTL_SRCS = top.sv axi.sv systolic_16x16.sv pe.sv \
            bf16_mac_unit.sv bf16_mul.sv bf16_fp32_add.sv \
            weight_sram.sv act_sram.sv output_sram.sv \
            act_stagger.sv accum_sram.sv bias_sram.sv \
@@ -26,7 +26,7 @@ obj_top/Vsys_top: $(RTL_SRCS) $(C_SRCS) tb_top.cpp
 	    $(RTL_SRCS) tb_top.cpp $(C_SRCS)
 
 run: obj_top/Vsys_top
-	@echo "=== 32x32 BF16 systolic + bias + GELU testbench ==="
+	@echo "=== 16x16 BF16 systolic + bias + GELU testbench ==="
 	./obj_top/Vsys_top
 
 clean:
