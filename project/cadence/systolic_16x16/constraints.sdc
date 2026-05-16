@@ -12,10 +12,10 @@
 # =============================================================================
 
 # ── Clock ─────────────────────────────────────────────────────────────────────
-create_clock -name clk -period 1.650 [get_ports clk]
-set_clock_uncertainty -setup 0.050 [get_clocks clk]
-set_clock_uncertainty -hold  0.025 [get_clocks clk]
-set_clock_transition         0.010 [get_clocks clk]
+create_clock -name clk -period 1650 [get_ports clk]
+set_clock_uncertainty -setup 50 [get_clocks clk]
+set_clock_uncertainty -hold  25 [get_clocks clk]
+set_clock_transition         10 [get_clocks clk]
 
 # ── Reset ─────────────────────────────────────────────────────────────────────
 # Asynchronous active-low reset — no functional timing arc through rst_n.
@@ -24,12 +24,12 @@ set_false_path -from [get_ports rst_n]
 # ── Input delays ──────────────────────────────────────────────────────────────
 # 500 ps max / 0 ps min — conservative model for an on-chip block interface.
 set all_data_inputs [remove_from_collection [all_inputs] [get_ports {clk rst_n}]]
-set_input_delay -clock clk -max 0.500 $all_data_inputs
-set_input_delay -clock clk -min 0.000 $all_data_inputs
+set_input_delay -clock clk -max 500 $all_data_inputs
+set_input_delay -clock clk -min 0   $all_data_inputs
 
 # ── Output delays ─────────────────────────────────────────────────────────────
-set_output_delay -clock clk -max 0.500 [all_outputs]
-set_output_delay -clock clk -min 0.000 [all_outputs]
+set_output_delay -clock clk -max 500 [all_outputs]
+set_output_delay -clock clk -min 0   [all_outputs]
 
 # ── Drive and load assumptions ────────────────────────────────────────────────
 set_driving_cell -lib_cell BUFx4_ASAP7_75t_R -pin Y \
