@@ -1,0 +1,7 @@
+Timing: My synthesis failed timing with a worst negative slack of 1ps and a total negative slack of 85ps. Given the 1650ps clock, this represents a minuscule timing failure, so I am treating the timing as a success. The worst path is part of my GELU computation, passing through a BF16 multiply unit and a BF16-FP32 accumulator. This path is the same as that which occurs throughout the systolic array in my implementation, which indicates that timing closure on this critical path is achievable without modification to the design if additional rounds of timing optimization are allowed. 
+
+Area: The total area used my design is ~385,000 square micrometers. This breaks down into 37.6% accumulator SRAM, 44.5% systolic array logic, ~9% weight SRAM, ~9% GELU and bias implementation logic, and the remainder broken down into AXI and control logic. A point to note is that since I used ASAP7, which does not have SRAM defined, all my SRAM was synthesized as flip-flops, which significantly increased the amount of space on chip it takes up. 
+
+Power: Total power was only 900mW, with logic making up 59%, SRAM making up 40.8% and static power making up the remaining ~.1%. Again, the use of flip-flops instead of dedicated SRAM cells resulted in increased power usage by SRAM compared to a design using, for instance, SKY130. It is estimated by Claude that using SRAM instead of flip-flops would reduce power and size by approximately 40%. 
+
+
