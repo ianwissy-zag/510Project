@@ -1,0 +1,16 @@
+Test 1: M=4, W=1, act=m+1 → C=ROWS*(m+1)
+  PASS
+Test 2: 2 K-tiles → C=2*ROWS=64
+  PASS
+Test 3: M=16, W=2, act=1 → C=2*ROWS=64
+  PASS
+Test 4: backward, W^T=1, dout=1 → C=ROWS=32
+  PASS
+Test 5: bias=0.5 → C=ROWS+0.5=32.5
+  PASS
+Test 6: no bias, GELU(ROWS=32) → 32.0000
+  PASS
+Test 7: bias=0.5, GELU(ROWS+0.5=32.5) → 32.5000
+  PASS
+
+All 32x32 fused tests PASSED.

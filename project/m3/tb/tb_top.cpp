@@ -7,18 +7,16 @@
 
 #include "Vsys_top.h"
 #include "verilated.h"
-#include "verilated_fst_c.h"
 #include <cstdio>
 #include <cstring>
 #include <cmath>
 
-static Vsys_top*    dut;
-static VerilatedFstC* tfp;
+static Vsys_top* dut;
 
 static void tick() {
-    dut->clk = 0; dut->eval(); dut->contextp()->timeInc(1); tfp->dump(dut->contextp()->time());
-    dut->clk = 1; dut->eval(); dut->contextp()->timeInc(1); tfp->dump(dut->contextp()->time());
-    dut->clk = 0; dut->eval(); dut->contextp()->timeInc(1); tfp->dump(dut->contextp()->time());
+    dut->clk = 0; dut->eval();
+    dut->clk = 1; dut->eval();
+    dut->clk = 0; dut->eval();
 }
 
 static void axi_idle() {
@@ -137,12 +135,7 @@ static float gelu_ref(float x) {
 
 int main() {
     VerilatedContext ctx;
-    ctx.traceEverOn(true);
     dut = new Vsys_top{&ctx};
-    tfp = new VerilatedFstC;
-    dut->trace(tfp, 99);
-    tfp->open("waves.fst");
-
     dut->rst_n=0; dut->start=0; dut->mode=0;
     dut->first_k_tile=1; dut->fwd_buf_sel=0; dut->bwd_buf_sel=0;
     dut->M_count=4; dut->rb_start=0; dut->m_axis_tready=0;
@@ -262,7 +255,6 @@ int main() {
     }
 
     printf("\nAll 32x32 fused tests %s.\n", all_pass?"PASSED":"FAILED");
-    tfp->close(); delete tfp;
     dut->final(); delete dut;
     return all_pass ? 0 : 1;
 }

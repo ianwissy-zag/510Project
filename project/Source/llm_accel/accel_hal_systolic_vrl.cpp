@@ -131,13 +131,36 @@ extern "C" void hal_stream_tile(const bf16_t* w_tile, const bf16_t* acts,
     else           g_bwd_tiles++;
 }
 
-// ── Streaming readback ────────────────────────────────────────────────────────
-// Collects 2×M_count AXI beats from the accumulator SRAM.
-// out layout: out[m * ACCEL_SYS_COLS + n] = C[m][n]
-extern "C" void hal_read_results_all(float* out, int M_count) {
-    const int VPB  = 16;  // FP32 values per 512-bit beat
+// ── Bias SRAM load ────────────────────────────────────────────────────────────
+// Sends ACCEL_SYS_COLS FP32 bias values into the hardware bias SRAM via AXI
+// (tuser=6, 3'b110).  Must be called before any readback that uses apply_bias=1.
+// Two beats: beat 0 → bias[0..COLS/2-1], beat 1 → bias[COLS/2..COLS-1].
+extern "C" void hal_load_bias(const float* bias, int N) {
+    const int VPB = N / 2;  // FP32 values per beat
+    for (int beat = 0; beat < 2; beat++) {
+        memset(g_dut->s_axis_tdata, 0, sizeof(g_dut->s_axis_tdata));
+        for (int i = 0; i < VPB; i++) {
+            uint32_t bits;
+            memcpy(&bits, &bias[beat * VPB + i], sizeof(float));
+            g_dut->s_axis_tdata[i] = bits;
+        }
+        g_dut->s_axis_tuser  = 6;
+        g_dut->s_axis_tvalid = 1;
+        g_dut->s_axis_tlast  = (beat == 1) ? 1 : 0;
+        tick(); axi_idle();
+    }
+}
+
+// ── Readback (internal helper) ────────────────────────────────────────────────
+// Triggers one readback with the requested apply_bias / apply_gelu flags.
+// accum_sram is read-only during readback so multiple calls from the same
+// accumulated result are safe.
+static void readback_all(float* out, int M_count, int ab, int ag) {
+    const int VPB  = 16;
     const int COLS = ACCEL_SYS_COLS;
 
+    g_dut->apply_bias    = ab;
+    g_dut->apply_gelu    = ag;
     g_dut->m_axis_tready = 1;
     g_dut->rb_start = 1; tick(); g_dut->rb_start = 0;
 
@@ -156,10 +179,31 @@ extern "C" void hal_read_results_all(float* out, int M_count) {
         tick();
     }
     if (beats < need)
-        fprintf(stderr, "[systolic/vrl] WARNING: only %d/%d readback beats\n",
-                beats, need);
+        fprintf(stderr, "[systolic/vrl] WARNING: only %d/%d readback beats "
+                "(apply_bias=%d apply_gelu=%d)\n", beats, need, ab, ag);
 
+    g_dut->apply_bias    = 0;
+    g_dut->apply_gelu    = 0;
     g_dut->m_axis_tready = 0; tick();
+}
+
+// ── Readback public variants ──────────────────────────────────────────────────
+// raw:              apply_bias=0, apply_gelu=0  (accumulator output only)
+// gelu:             apply_bias=0, apply_gelu=1  (inference without bias)
+// biased:           apply_bias=1, apply_gelu=0  (fch = matmul + bias)
+// biased_gelu:      apply_bias=1, apply_gelu=1  (fch_gelu = GELU(matmul+bias))
+
+extern "C" void hal_read_results_all(float* out, int M_count) {
+    readback_all(out, M_count, 0, 0);
+}
+extern "C" void hal_read_results_all_gelu(float* out, int M_count) {
+    readback_all(out, M_count, 0, 1);
+}
+extern "C" void hal_read_results_all_biased(float* out, int M_count) {
+    readback_all(out, M_count, 1, 0);
+}
+extern "C" void hal_read_results_all_biased_gelu(float* out, int M_count) {
+    readback_all(out, M_count, 1, 1);
 }
 
 // ── Legacy single-tile interface (unused for systolic_vrl, kept for linking) ──

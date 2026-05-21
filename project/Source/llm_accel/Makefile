@@ -110,11 +110,13 @@ else ifeq ($(BACKEND), systolic)
   ACCEL_INC   =
   LINK_CXX    = 0
 else ifeq ($(BACKEND), systolic_vrl)
-  # Verilator cycle-accurate simulation of HDL_Systolic_16x32
-  HDL_DIR     = ../../HDL_Systolic_16x32
-  HDL_SRCS    = top.sv axi.sv systolic_16x32.sv pe.sv \
+  # Verilator cycle-accurate simulation of HDL_Systolic_32x32
+  HDL_DIR     = ../../HDL_Systolic_32x32
+  HDL_SRCS    = top.sv axi.sv systolic_32x32.sv pe.sv \
                 bf16_mac_unit.sv bf16_mul.sv bf16_fp32_add.sv \
                 weight_sram.sv act_sram.sv output_sram.sv \
+                act_stagger.sv accum_sram.sv bias_sram.sv \
+                fp32_recip.sv gelu_unit.sv \
                 controller.sv axi_readback.sv
   OBJ_LIB     = $(HDL_DIR)/obj_lib
   ACCEL_SRC   = accel_hal_systolic_vrl.cpp

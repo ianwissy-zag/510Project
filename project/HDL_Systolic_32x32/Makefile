@@ -1,5 +1,5 @@
 VERILATOR  ?= verilator
-VFLAGS      = --cc --exe --build -sv --Wno-fatal --Wno-WIDTH
+VFLAGS      = --cc --exe --build -sv --Wno-fatal --Wno-WIDTH --trace-fst
 VFLAGS_LIB  = --cc        --build -sv --Wno-fatal --Wno-WIDTH
 
 RTL_SRCS = top.sv axi.sv systolic_32x32.sv pe.sv \

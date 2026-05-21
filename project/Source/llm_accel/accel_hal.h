@@ -59,8 +59,16 @@ void hal_read_results(float* out);
 void hal_stream_tile(const bf16_t* w_tile, const bf16_t* acts,
                      int M_count, int first_k, int mode);
 
-// Read M_count × SYS_COLS FP32 results (all M rows at once).
-void hal_read_results_all(float* out, int M_count);
+// Load N FP32 bias values into the hardware bias SRAM (N must equal SYS_COLS).
+// Must be called before any readback that uses apply_bias=1.
+void hal_load_bias(const float* bias, int N);
+
+// Readback variants — accum_sram is read-only so multiple calls from the same
+// accumulated result are safe (bias+GELU are applied on the way out only).
+void hal_read_results_all(float* out, int M_count);             // raw
+void hal_read_results_all_gelu(float* out, int M_count);        // GELU(raw)
+void hal_read_results_all_biased(float* out, int M_count);      // raw+bias = fch
+void hal_read_results_all_biased_gelu(float* out, int M_count); // GELU(raw+bias) = fch_gelu
 
 // ── Backward dinp tile (systolic backends only) ───────────────────────────────
 // wT_tile : SYS_ROWS × SYS_COLS BF16 values of the TRANSPOSED weight matrix

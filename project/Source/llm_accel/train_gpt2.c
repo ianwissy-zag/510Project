@@ -247,6 +247,79 @@ static void accel_matmul(float* out, const float* inp, const float* weight,
     }
 }
 
+// Fused matmul + hardware bias + hardware GELU for the FFN up-projection.
+// Produces out_raw = matmul+bias (fch) and out_gelu = GELU(matmul+bias) (fch_gelu)
+// in a single tiling pass using two back-to-back readbacks per N-tile.
+// bias must be non-NULL and have N values; it is loaded into the hardware
+// bias SRAM once per N-tile immediately before the readback pair.
+static void accel_matmul_gelu(float* out_raw, float* out_gelu,
+                               const float* inp, const float* weight,
+                               const float* bias, int M, int K, int N) {
+    int N_tiles = N / TILE_N;
+    int N_rem   = N % TILE_N;
+    int K_tiles = K / TILE_K;
+    int K_rem   = K % TILE_K;
+
+    for (int nt = 0; nt < N_tiles; nt++) {
+        int n_base = nt * TILE_N;
+
+        for (int kt = 0; kt < K_tiles; kt++) {
+            int k_base  = kt * TILE_K;
+            int first_k = (kt == 0);
+            for (int k = 0; k < TILE_K; k++)
+                for (int n = 0; n < TILE_N; n++)
+                    s_w_tile[k * TILE_N + n] =
+                        float_to_bf16(weight[(n_base + n) * K + k_base + k]);
+            for (int m = 0; m < M; m++)
+                for (int k = 0; k < TILE_K; k++)
+                    s_acts_all[m * TILE_K + k] =
+                        float_to_bf16(inp[m * K + k_base + k]);
+            hal_stream_tile(s_w_tile, s_acts_all, M, first_k, 0);
+        }
+
+        if (K_tiles > 0) {
+            // Load this N-tile's bias values into the hardware bias SRAM.
+            hal_load_bias(bias + n_base, TILE_N);
+
+            // Readback 1: matmul + bias → fch (apply_bias=1, apply_gelu=0)
+            hal_read_results_all_biased(s_result_all, M);
+            for (int m = 0; m < M; m++)
+                for (int n = 0; n < TILE_N; n++)
+                    out_raw[m * N + n_base + n] = s_result_all[m * TILE_N + n];
+
+            // Readback 2: GELU(matmul+bias) → fch_gelu (apply_bias=1, apply_gelu=1)
+            hal_read_results_all_biased_gelu(s_result_all, M);
+            for (int m = 0; m < M; m++)
+                for (int n = 0; n < TILE_N; n++)
+                    out_gelu[m * N + n_base + n] = s_result_all[m * TILE_N + n];
+        }
+
+        // K remainder — computed on CPU; bias applied and GELU computed in software
+        if (K_rem > 0) {
+            int k_base = K_tiles * TILE_K;
+            for (int m = 0; m < M; m++)
+                for (int k = 0; k < K_rem; k++) {
+                    float a = inp[m * K + k_base + k];
+                    for (int n = 0; n < TILE_N; n++)
+                        out_raw[m * N + n_base + n] +=
+                            a * weight[(n_base + n) * K + k_base + k];
+                }
+        }
+    }
+
+    // N remainder — entirely on CPU
+    if (N_rem > 0) {
+        int n_base = N_tiles * TILE_N;
+        for (int m = 0; m < M; m++)
+            for (int n = 0; n < N_rem; n++) {
+                float val = 0.0f;
+                for (int k = 0; k < K; k++)
+                    val += inp[m * K + k] * weight[(n_base + n) * K + k];
+                out_raw[m * N + n_base + n] = val;
+            }
+    }
+}
+
 #else
 // Non-streaming path: single-row tile interface (vector/software backends).
 static void accel_matmul(float* out, const float* inp, const float* weight,
@@ -443,6 +516,61 @@ void matmul_forward(float* out,
             for (int o = 0; o < OC; o++)
                 out[bt * OC + o] += bias[o];
     }
+}
+
+// FFN up-projection forward: produces fch (out_raw = matmul+bias) and
+// fch_gelu (out_gelu = GELU(matmul+bias)) in one call.
+//
+// For SYSTOLIC_VRL: uses hardware fused bias+GELU via two back-to-back
+// readbacks per N-tile (apply_bias=1, apply_gelu=0/1). The bias SRAM is
+// loaded with each N-tile's bias slice before the readback pair, so GELU
+// sees the biased accumulator — GELU(matmul+bias) — which matches what
+// gelu_backward expects when it receives out_raw as its 'inp' argument.
+// Any N or K remainder columns are handled on CPU.
+//
+// For all other backends: falls back to accel_matmul + software bias + CPU GELU.
+void matmul_forward_gelu(float* out_raw, float* out_gelu,
+                          const float* inp, const float* weight, const float* bias,
+                          int B, int T, int C, int OC) {
+#if defined(ACCEL_BACKEND_SYSTOLIC_VRL)
+    accel_matmul_gelu(out_raw, out_gelu, inp, weight, bias, B * T, C, OC);
+
+    // N and K remainders landed in out_raw without bias/GELU — fix up now.
+    int N_tiles = OC / TILE_N;
+    int N_rem   = OC % TILE_N;
+    int K_rem   = C  % TILE_K;
+    if (N_rem > 0 || K_rem > 0) {
+        // Apply bias and GELU to any remainder elements on CPU.
+        int n_base_rem = N_tiles * TILE_N;
+        for (int bt = 0; bt < B * T; bt++) {
+            // N remainder columns (all K already accumulated)
+            for (int n = 0; n < N_rem; n++) {
+                int idx = bt * OC + n_base_rem + n;
+                if (bias) out_raw[idx] += bias[n_base_rem + n];
+                float x = out_raw[idx], cube = 0.044715f * x * x * x;
+                out_gelu[idx] = 0.5f * x *
+                    (1.0f + tanhf(GELU_SCALING_FACTOR * (x + cube)));
+            }
+            // Tiled N columns that had a K remainder (bias+GELU not yet applied)
+            if (K_rem > 0) {
+                for (int n = 0; n < N_tiles * TILE_N; n++) {
+                    int idx = bt * OC + n;
+                    if (bias) out_raw[idx] += bias[n];
+                    float x = out_raw[idx], cube = 0.044715f * x * x * x;
+                    out_gelu[idx] = 0.5f * x *
+                        (1.0f + tanhf(GELU_SCALING_FACTOR * (x + cube)));
+                }
+            }
+        }
+    }
+#else
+    accel_matmul(out_raw, inp, weight, B * T, C, OC);
+    if (bias != NULL)
+        for (int bt = 0; bt < B * T; bt++)
+            for (int o = 0; o < OC; o++)
+                out_raw[bt * OC + o] += bias[o];
+    gelu_forward(out_gelu, out_raw, B * T * OC);
+#endif
 }
 
 void matmul_backward(float* dinp, float* dweight, float* dbias,
@@ -1190,8 +1318,7 @@ void gpt2_forward(GPT2 *model, int* inputs, int* targets, size_t B, size_t T) {
         matmul_forward(l_attproj, l_atty, l_attprojw, l_attprojb, B, T, C, C);
         residual_forward(l_residual2, residual, l_attproj, B*T*C);
         layernorm_forward(l_ln2, l_ln2_mean, l_ln2_rstd, l_residual2, l_ln2w, l_ln2b, B, T, C);
-        matmul_forward(l_fch, l_ln2, l_fcw, l_fcb, B, T, C, 4*C);
-        gelu_forward(l_fch_gelu, l_fch, B*T*4*C);
+        matmul_forward_gelu(l_fch, l_fch_gelu, l_ln2, l_fcw, l_fcb, B, T, C, 4*C);
         matmul_forward(l_fcproj, l_fch_gelu, l_fcprojw, l_fcprojb, B, T, 4*C, C);
         residual_forward(l_residual3, l_residual2, l_fcproj, B*T*C);
     }
