@@ -30,6 +30,41 @@ There will be other versions of this code that specialize it and make it fast.
 // accelerator HAL — backend selected at compile time via -DACCEL_BACKEND_*
 #include "accel_hal.h"
 
+#define GELU_SCALING_FACTOR sqrtf(2.0f / M_PI)
+
+// forward declaration — gelu_forward is defined later in this file
+void gelu_forward(float* out, float* inp, int N);
+
+// ── CPU profiling helpers ─────────────────────────────────────────────────────
+static double now_s(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec + ts.tv_nsec * 1e-9;
+}
+
+// RAPL package energy counter (microjoules). Returns -1 if unavailable.
+static long long rapl_energy_uj(void) {
+    FILE* f = fopen("/sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj", "r");
+    if (!f) return -1LL;
+    long long val = -1LL;
+    fscanf(f, "%lld", &val);
+    fclose(f);
+    return val;
+}
+
+typedef struct {
+    double fwd_total_s;   // full gpt2_forward wall time
+    double bwd_total_s;   // full gpt2_backward wall time
+    double attention_s;   // attention_forward + attention_backward
+    double layernorm_s;   // all layernorm_forward + layernorm_backward calls
+    double gelu_bwd_s;    // gelu_backward (forward GELU is hardware-fused)
+    double other_s;       // residuals, encoder, softmax, crossentropy, optimizer
+    double vrl_matmul_s;  // Verilator wall time for all accel_matmul* calls
+    double matmul_s;      // wall time for all matmul_forward/gelu/backward calls (all backends)
+    long long matmul_energy_uj; // RAPL package energy consumed during matmul calls (microjoules)
+} CpuProfile;
+static CpuProfile g_prof;
+
 // ----------------------------------------------------------------------------
 // all the individual layers' forward and backward passes
 // B = batch_size, T = sequence_length, C = channels, V = vocab_size
@@ -166,7 +201,7 @@ void layernorm_backward(float* dinp, float* dweight, float* dbias,
 // Systolic backends use SYS_COLS/SYS_ROWS; vector backends use VEC_SIZE/K_DEPTH.
 #if defined(ACCEL_BACKEND_SYSTOLIC) || defined(ACCEL_BACKEND_SYSTOLIC_VRL)
 #  define TILE_N  ACCEL_SYS_COLS   // 32
-#  define TILE_K  ACCEL_SYS_ROWS   // 16
+#  define TILE_K  ACCEL_SYS_ROWS   // 32
 #else
 #  define TILE_N  ACCEL_VEC_SIZE   // 128
 #  define TILE_K  ACCEL_K_DEPTH    // 32
@@ -191,6 +226,8 @@ static void accel_matmul(float* out, const float* inp, const float* weight,
     int N_rem   = N % TILE_N;
     int K_tiles = K / TILE_K;
     int K_rem   = K % TILE_K;
+    double _t_vrl = now_s();
+    long long _cyc0 = hal_sim_cycle_snapshot();
 
     for (int nt = 0; nt < N_tiles; nt++) {
         int n_base = nt * TILE_N;
@@ -245,6 +282,8 @@ static void accel_matmul(float* out, const float* inp, const float* weight,
                 out[m * N + n_base + n] = val;
             }
     }
+    hal_account_hw_cycles(hal_sim_cycle_snapshot() - _cyc0, 0);
+    g_prof.vrl_matmul_s += now_s() - _t_vrl;
 }
 
 // Fused matmul + hardware bias + hardware GELU for the FFN up-projection.
@@ -259,6 +298,8 @@ static void accel_matmul_gelu(float* out_raw, float* out_gelu,
     int N_rem   = N % TILE_N;
     int K_tiles = K / TILE_K;
     int K_rem   = K % TILE_K;
+    double _t_vrl = now_s();
+    long long _cyc0 = hal_sim_cycle_snapshot();
 
     for (int nt = 0; nt < N_tiles; nt++) {
         int n_base = nt * TILE_N;
@@ -318,53 +359,90 @@ static void accel_matmul_gelu(float* out_raw, float* out_gelu,
                 out_raw[m * N + n_base + n] = val;
             }
     }
+    hal_account_hw_cycles(hal_sim_cycle_snapshot() - _cyc0, 0);
+    g_prof.vrl_matmul_s += now_s() - _t_vrl;
 }
 
 #else
-// Non-streaming path: single-row tile interface (vector/software backends).
+// Non-streaming path: BF16-simulated matmul with OpenMP.
+//
+// Two implementation flaws from the original tile loop are fixed here:
+//   (a) weight repacking: weights are now converted to BF16 once per
+//       (N-tile, K-tile) pair and cached for reuse across all M-rows;
+//   (b) missing OpenMP: M × N-tile pairs are independent and are now
+//       parallelised with #pragma omp parallel for collapse(2).
+//
+// BF16 multiply / FP32 accumulate semantics are identical to hardware:
+// every activation and weight value still passes through float_to_bf16 /
+// bf16_to_float on each multiply, as the real array would.
+//
+// hal_compute_tile is NOT called: its shared sw_psum prevents OpenMP
+// parallelism and calling it row-by-row prevents weight caching.
+
+static bf16_t* s_sw_w_cache     = NULL;
+static int     s_sw_w_cache_cap = 0;
+
 static void accel_matmul(float* out, const float* inp, const float* weight,
                           int M, int K, int N) {
-    bf16_t w_tile[TILE_K * TILE_N];
-    bf16_t act_tile[TILE_K];
-    float  result_tile[TILE_N];
-
     int N_tiles = N / TILE_N;
     int N_rem   = N % TILE_N;
     int K_tiles = K / TILE_K;
     int K_rem   = K % TILE_K;
 
+    // Pre-convert all weight tiles to BF16 once per call.
+    // Grows the cache to fit the largest matrix seen; never shrinks.
+    int w_need = N_tiles * K_tiles * TILE_K * TILE_N;
+    if (w_need > s_sw_w_cache_cap) {
+        free(s_sw_w_cache);
+        s_sw_w_cache     = (bf16_t*)malloc((size_t)w_need * sizeof(bf16_t));
+        s_sw_w_cache_cap = w_need;
+    }
     for (int nt = 0; nt < N_tiles; nt++) {
         int n_base = nt * TILE_N;
-        for (int m = 0; m < M; m++) {
+        for (int kt = 0; kt < K_tiles; kt++) {
+            int k_base = kt * TILE_K;
+            bf16_t* dst = s_sw_w_cache + (nt * K_tiles + kt) * (TILE_K * TILE_N);
+            for (int k = 0; k < TILE_K; k++)
+                for (int n = 0; n < TILE_N; n++)
+                    dst[k * TILE_N + n] =
+                        float_to_bf16(weight[(n_base + n) * K + k_base + k]);
+        }
+    }
+
+    // BF16 MAC, parallelised over (m, nt).
+    #pragma omp parallel for collapse(2) schedule(static)
+    for (int m = 0; m < M; m++) {
+        for (int nt = 0; nt < N_tiles; nt++) {
+            int n_base = nt * TILE_N;
+            float acc[TILE_N];
+            memset(acc, 0, sizeof(acc));
             for (int kt = 0; kt < K_tiles; kt++) {
-                int k_base  = kt * TILE_K;
-                int first_k = (kt == 0);
-                for (int k = 0; k < TILE_K; k++)
+                int k_base = kt * TILE_K;
+                const bf16_t* wtile =
+                    s_sw_w_cache + (nt * K_tiles + kt) * (TILE_K * TILE_N);
+                for (int k = 0; k < TILE_K; k++) {
+                    float a = bf16_to_float(float_to_bf16(inp[m * K + k_base + k]));
                     for (int n = 0; n < TILE_N; n++)
-                        w_tile[k * TILE_N + n] =
-                            float_to_bf16(weight[(n_base + n) * K + k_base + k]);
-                for (int k = 0; k < TILE_K; k++)
-                    act_tile[k] = float_to_bf16(inp[m * K + k_base + k]);
-                hal_compute_tile(w_tile, act_tile, first_k);
+                        acc[n] += a * bf16_to_float(wtile[k * TILE_N + n]);
+                }
             }
-            if (K_tiles > 0)
-                hal_read_results(result_tile);
-            else
-                memset(result_tile, 0, sizeof(result_tile));
+            // K remainder: scalar FP32 (sub-tile width elements)
             if (K_rem > 0) {
                 int k_base = K_tiles * TILE_K;
                 for (int k = 0; k < K_rem; k++) {
                     float a = inp[m * K + k_base + k];
                     for (int n = 0; n < TILE_N; n++)
-                        result_tile[n] += a * weight[(n_base + n) * K + k_base + k];
+                        acc[n] += a * weight[(n_base + n) * K + k_base + k];
                 }
             }
             for (int n = 0; n < TILE_N; n++)
-                out[m * N + n_base + n] = result_tile[n];
+                out[m * N + n_base + n] = acc[n];
         }
     }
+    // N remainder: scalar FP32 (sub-tile width columns)
     if (N_rem > 0) {
         int n_base = N_tiles * TILE_N;
+        #pragma omp parallel for
         for (int m = 0; m < M; m++)
             for (int n = 0; n < N_rem; n++) {
                 float val = 0.0f;
@@ -373,6 +451,11 @@ static void accel_matmul(float* out, const float* inp, const float* weight,
                 out[m * N + n_base + n] = val;
             }
     }
+    // Formula estimate only for systolic-sw backend (same tile geometry as VRL).
+#if defined(ACCEL_BACKEND_SYSTOLIC)
+    if (K_tiles > 0)
+        hal_account_hw_cycles((long long)N_tiles * K_tiles * (2*TILE_K + M + 1), 0);
+#endif
 }
 #endif
 
@@ -415,6 +498,10 @@ static void accel_matmul_backward_dinp(float* dinp, const float* dout,
     int K_rem   = K % TILE_N;
     int N_tiles = N / TILE_K;
     int N_rem   = N % TILE_K;
+#if defined(ACCEL_BACKEND_SYSTOLIC_VRL)
+    double _t_vrl = now_s();
+    long long _cyc0 = hal_sim_cycle_snapshot();
+#endif
 
 #if defined(ACCEL_BACKEND_SYSTOLIC_VRL)
     // Streaming backward: all M rows per (K-tile, N-tile) pass
@@ -499,6 +586,148 @@ static void accel_matmul_backward_dinp(float* dinp, const float* dout,
                     dinp[m*K + k_base+k] += d * weight[n*K + k_base+k];
             }
     }
+#if defined(ACCEL_BACKEND_SYSTOLIC_VRL)
+    hal_account_hw_cycles(hal_sim_cycle_snapshot() - _cyc0, 1);
+    g_prof.vrl_matmul_s += now_s() - _t_vrl;
+#else
+    if (K_tiles > 0)
+        hal_account_hw_cycles((long long)K_tiles * N_tiles * (2*TILE_K + M + 1), 1);
+#endif
+}
+
+// ── dweight tiling engine ─────────────────────────────────────────────────────
+// dweight[c][oc] = sum_m(inp[m][c] * dout[m][oc])
+//
+// Map: OC tiled by TILE_N, M chunked into TILE_K-sized K-tiles, C is the
+// streaming "M-count" dimension.  Each (oc_tile, m_chunk) hardware pass streams
+// C activation rows, one per C-value.  The m-chunk loop accumulates the M
+// inner-product depth across TILE_K m-samples at a time.
+//
+// Hardware cycle formula (M_MAX=256 tiling of C):
+//   OC_tiles × M_chunks × ceil(C/256) × (2×TILE_K + min(C,256) + 1)
+
+static void accel_matmul_dweight(float* dweight, const float* inp, const float* dout,
+                                  int M, int C, int OC) {
+    int OC_tiles = OC / TILE_N;
+    int OC_rem   = OC % TILE_N;
+    int M_chunks = M  / TILE_K;
+    int M_rem    = M  % TILE_K;
+#if defined(ACCEL_BACKEND_SYSTOLIC_VRL)
+    double _t_vrl = now_s();
+    long long _cyc0 = hal_sim_cycle_snapshot();
+#endif
+
+#if !defined(ACCEL_BACKEND_SYSTOLIC_VRL)
+    // Software sim: hal_compute_tile, one C-value at a time.
+    bf16_t w_tile[TILE_K * TILE_N];
+    bf16_t act_col[TILE_K];
+    float  result[TILE_N];
+
+    for (int oct = 0; oct < OC_tiles; oct++) {
+        int oc_base = oct * TILE_N;
+        for (int c = 0; c < C; c++) {
+            // Accumulate dweight[c][oc_tile] over all m-chunks (K-tiles).
+            for (int mc = 0; mc < M_chunks; mc++) {
+                int m_base = mc * TILE_K;
+                // Weight tile: dout[m_chunk, oc_tile]
+                for (int k = 0; k < TILE_K; k++)
+                    for (int n = 0; n < TILE_N; n++)
+                        w_tile[k * TILE_N + n] =
+                            float_to_bf16(dout[(m_base+k)*OC + oc_base+n]);
+                // Activation: column c of inp for this m-chunk
+                for (int k = 0; k < TILE_K; k++)
+                    act_col[k] = float_to_bf16(inp[(m_base+k)*C + c]);
+                hal_compute_tile(w_tile, act_col, (mc == 0));
+            }
+            if (M_chunks > 0)
+                hal_read_results(result);
+            else
+                memset(result, 0, sizeof(result));
+            // M remainder on CPU
+            if (M_rem > 0) {
+                int m_base = M_chunks * TILE_K;
+                for (int k = 0; k < M_rem; k++) {
+                    float a = inp[(m_base+k)*C + c];
+                    for (int n = 0; n < TILE_N; n++)
+                        result[n] += a * dout[(m_base+k)*OC + oc_base+n];
+                }
+            }
+            for (int n = 0; n < TILE_N; n++)
+                dweight[c*OC + oc_base+n] += result[n];
+        }
+    }
+#else
+    // VRL streaming path: maps dweight = inp^T @ dout onto the forward systolic array.
+    // M_sys = C (chunked ≤ 256), K_sys = M_batch (tiled by TILE_K), N_sys = OC.
+    // weight_tile[k][n] = dout[(m_base+k)*OC + oc_base+n]
+    // acts[ci][k]       = inp [(m_base+k)*C  + c_start+ci]
+    for (int nt = 0; nt < OC_tiles; nt++) {
+        int oc_base = nt * TILE_N;
+        for (int c_start = 0; c_start < C; c_start += 256) {
+            int c_count = (c_start + 256 <= C) ? 256 : C - c_start;
+            for (int kt = 0; kt < M_chunks; kt++) {
+                int m_base  = kt * TILE_K;
+                int first_k = (kt == 0);
+                for (int k = 0; k < TILE_K; k++)
+                    for (int n = 0; n < TILE_N; n++)
+                        s_w_tile[k * TILE_N + n] =
+                            float_to_bf16(dout[(m_base + k) * OC + oc_base + n]);
+                for (int ci = 0; ci < c_count; ci++)
+                    for (int k = 0; k < TILE_K; k++)
+                        s_acts_all[ci * TILE_K + k] =
+                            float_to_bf16(inp[(m_base + k) * C + c_start + ci]);
+                hal_stream_tile(s_w_tile, s_acts_all, c_count, first_k, 0);
+            }
+            if (M_chunks > 0) {
+                hal_read_results_all(s_result_all, c_count);
+                for (int ci = 0; ci < c_count; ci++)
+                    for (int n = 0; n < TILE_N; n++)
+                        dweight[(c_start + ci) * OC + oc_base + n] +=
+                            s_result_all[ci * TILE_N + n];
+            }
+            if (M_rem > 0) {
+                int m_base = M_chunks * TILE_K;
+                for (int ci = 0; ci < c_count; ci++)
+                    for (int k = 0; k < M_rem; k++) {
+                        float a = inp[(m_base + k) * C + c_start + ci];
+                        for (int n = 0; n < TILE_N; n++)
+                            dweight[(c_start + ci) * OC + oc_base + n] +=
+                                a * dout[(m_base + k) * OC + oc_base + n];
+                    }
+            }
+        }
+    }
+#endif
+
+    // OC remainder (CPU, both paths)
+    if (OC_rem > 0) {
+        int oc_base = OC_tiles * TILE_N;
+        for (int c = 0; c < C; c++)
+            for (int m = 0; m < M; m++) {
+                float a = inp[m*C + c];
+                for (int n = 0; n < OC_rem; n++)
+                    dweight[c*OC + oc_base+n] += a * dout[m*OC + oc_base+n];
+            }
+    }
+
+    // Hardware cycle accounting.
+    // C is tiled into chunks of M_MAX=256 (hardware accum_sram depth).
+    // Each (oc_tile, m_chunk, c_tile) pass: LOAD_WT + STREAM(min(C,256)).
+    if (M_chunks > 0 && OC_tiles > 0) {
+        int c_mmax    = 256;
+        int c_tiles   = (C + c_mmax - 1) / c_mmax;
+        int c_last    = C - (c_tiles-1)*c_mmax;
+        long long cyc = (long long)OC_tiles * M_chunks *
+                        ((c_tiles-1) * (2*TILE_K + c_mmax + 1) +
+                                       (2*TILE_K + c_last  + 1));
+#if !defined(ACCEL_BACKEND_SYSTOLIC_VRL)
+        hal_account_hw_cycles(cyc, 1);
+#endif
+    }
+#if defined(ACCEL_BACKEND_SYSTOLIC_VRL)
+    hal_account_hw_cycles(hal_sim_cycle_snapshot() - _cyc0, 1);
+    g_prof.vrl_matmul_s += now_s() - _t_vrl;
+#endif
 }
 #endif
 
@@ -508,6 +737,8 @@ void matmul_forward(float* out,
     // Accelerator-backed matrix multiply.
     // inp is (B,T,C), weight is (OC,C), out is (B,T,OC).
     // The accelerator handles the multiply-accumulate; bias is added on CPU.
+    double _t0 = now_s();
+    long long _e0 = rapl_energy_uj();
     accel_matmul(out, inp, weight, B * T, C, OC);
 
     // Bias addition — accelerator has no bias path, done in software
@@ -516,6 +747,11 @@ void matmul_forward(float* out,
             for (int o = 0; o < OC; o++)
                 out[bt * OC + o] += bias[o];
     }
+    long long _e1 = rapl_energy_uj();
+    if (_e0 >= 0 && _e1 >= 0)
+        g_prof.matmul_energy_uj += (_e1 >= _e0) ? (_e1 - _e0)
+                                                 : (_e1 + (281474976710656LL - _e0)); // wraparound
+    g_prof.matmul_s += now_s() - _t0;
 }
 
 // FFN up-projection forward: produces fch (out_raw = matmul+bias) and
@@ -532,8 +768,114 @@ void matmul_forward(float* out,
 void matmul_forward_gelu(float* out_raw, float* out_gelu,
                           const float* inp, const float* weight, const float* bias,
                           int B, int T, int C, int OC) {
+    double _t0_mfg = now_s();
+    long long _e0_mfg = rapl_energy_uj();
 #if defined(ACCEL_BACKEND_SYSTOLIC_VRL)
     accel_matmul_gelu(out_raw, out_gelu, inp, weight, bias, B * T, C, OC);
+
+    // ── Hardware GELU verification (first call only) ──────────────────────────
+    // Compares hardware out_gelu against software GELU(out_raw) element-by-element.
+    // Reports max/mean relative error and a few sample values.
+    // Run once: the result is deterministic and this avoids repeating during training.
+    {
+        static int gelu_check_done = 0;
+        if (!gelu_check_done) {
+            gelu_check_done = 1;
+            int n_tiled = (OC / TILE_N) * TILE_N;  // hardware-covered columns
+            int BT      = B * T;
+            int checked = 0;
+            double max_abs = 0.0, max_rel = 0.0, sum_abs = 0.0, sum_rel = 0.0;
+            // Sample every 8th element to cover the range without excess overhead
+            for (int bt = 0; bt < BT; bt++) {
+                for (int n = 0; n < n_tiled; n++) {
+                    if ((bt * n_tiled + n) % 8 != 0) continue;
+                    float raw  = out_raw [bt * OC + n];
+                    float hw_g = out_gelu[bt * OC + n];
+                    float cube = 0.044715f * raw * raw * raw;
+                    float sw_g = 0.5f * raw *
+                        (1.0f + tanhf(GELU_SCALING_FACTOR * (raw + cube)));
+                    double ae = fabsf(hw_g - sw_g);
+                    double re = (fabsf(sw_g) > 1e-6f) ? ae / fabsf(sw_g) : ae;
+                    if (ae > max_abs) max_abs = ae;
+                    if (re > max_rel) max_rel = re;
+                    sum_abs += ae; sum_rel += re;
+                    checked++;
+                }
+            }
+            printf("\n[gelu_check] hardware vs software GELU comparison\n");
+            printf("  tiled columns=%d  BT=%d  samples checked=%d\n",
+                   n_tiled, BT, checked);
+            if (checked > 0) {
+                printf("  max_abs_err=%.6f  mean_abs_err=%.6f\n",
+                       max_abs, sum_abs / checked);
+                printf("  max_rel_err=%.4f  mean_rel_err=%.4f\n",
+                       max_rel, sum_rel / checked);
+            }
+            // Print 3 samples from row 0
+            printf("  sample (bt=0): ");
+            int show = (n_tiled < 3) ? n_tiled : 3;
+            for (int n = 0; n < show; n++) {
+                float raw  = out_raw[n];
+                float hw_g = out_gelu[n];
+                float cube = 0.044715f * raw * raw * raw;
+                float sw_g = 0.5f * raw * (1.0f + tanhf(GELU_SCALING_FACTOR * (raw + cube)));
+                printf("[n=%d raw=%.3f hw=%.3f sw=%.3f] ", n, raw, hw_g, sw_g);
+            }
+            printf("\n");
+        }
+    }
+
+    // ── Hardware matmul+bias accuracy check (first call only) ────────────────
+    // Compares out_raw (hardware matmul + hardware bias) against CPU FP32
+    // reference to determine whether the matmul itself is correct.
+    // This is independent of gelu_check: gelu_check only tests GELU quality
+    // given out_raw; this tests whether out_raw is numerically correct.
+    // Expected errors: ~1-2% for BF16 MAC; >10% indicates a hardware bug.
+    {
+        static int raw_check_done = 0;
+        if (!raw_check_done) {
+            raw_check_done = 1;
+            int n_tiled = (OC / TILE_N) * TILE_N;
+            int BT = B * T;
+            int checked = 0;
+            double max_abs = 0.0, max_rel = 0.0, sum_abs = 0.0, sum_rel = 0.0;
+            // Sample every 32nd (bt,n) pair — ~24k samples for BT=256, OC=3072.
+            for (int bt = 0; bt < BT; bt++) {
+                for (int n = 0; n < n_tiled; n++) {
+                    if ((bt * n_tiled + n) % 32 != 0) continue;
+                    float ref = (bias != NULL) ? bias[n] : 0.0f;
+                    for (int k = 0; k < C; k++)
+                        ref += inp[bt * C + k] * weight[n * C + k];
+                    float hw = out_raw[bt * OC + n];
+                    double ae = fabsf(hw - ref);
+                    double re = (fabsf(ref) > 1e-3f) ? ae / fabsf(ref) : ae;
+                    if (ae > max_abs) max_abs = ae;
+                    if (re > max_rel) max_rel = re;
+                    sum_abs += ae; sum_rel += re;
+                    checked++;
+                }
+            }
+            printf("\n[raw_check] hardware matmul+bias vs CPU FP32 reference\n");
+            printf("  tiled columns=%d  BT=%d  samples checked=%d\n",
+                   n_tiled, BT, checked);
+            if (checked > 0) {
+                printf("  max_abs_err=%.6f  mean_abs_err=%.6f\n",
+                       max_abs, sum_abs / checked);
+                printf("  max_rel_err=%.4f  mean_rel_err=%.4f\n",
+                       max_rel, sum_rel / checked);
+                printf("  (expected ~1-2%% for BF16 MAC; >10%% indicates HW bug)\n");
+            }
+            printf("  sample (bt=0): ");
+            int show = (n_tiled < 3) ? n_tiled : 3;
+            for (int n = 0; n < show; n++) {
+                float ref = (bias != NULL) ? bias[n] : 0.0f;
+                for (int k = 0; k < C; k++)
+                    ref += inp[0 * C + k] * weight[n * C + k];
+                printf("[n=%d hw=%.3f ref=%.3f] ", n, out_raw[n], ref);
+            }
+            printf("\n");
+        }
+    }
 
     // N and K remainders landed in out_raw without bias/GELU — fix up now.
     int N_tiles = OC / TILE_N;
@@ -571,14 +913,21 @@ void matmul_forward_gelu(float* out_raw, float* out_gelu,
                 out_raw[bt * OC + o] += bias[o];
     gelu_forward(out_gelu, out_raw, B * T * OC);
 #endif
+    {
+        long long _e1_mfg = rapl_energy_uj();
+        if (_e0_mfg >= 0 && _e1_mfg >= 0)
+            g_prof.matmul_energy_uj += (_e1_mfg >= _e0_mfg) ? (_e1_mfg - _e0_mfg)
+                                                              : (_e1_mfg + (281474976710656LL - _e0_mfg));
+    }
+    g_prof.matmul_s += now_s() - _t0_mfg;
 }
 
 void matmul_backward(float* dinp, float* dweight, float* dbias,
                      const float* dout, const float* inp, const float* weight,
                      int B, int T, int C, int OC) {
     // most of the running time is spent here and in matmul_forward
-    // this backward could be done in a single "round" of loops
-    // but that doesn't afford an efficient parallelization strategy
+    double _t0_mb = now_s();
+    long long _e0_mb = rapl_energy_uj();
 
     // backward into inp: dinp = dout x weight  (M×OC times OC×C = M×C)
 #if defined(ACCEL_BACKEND_SYSTOLIC) || defined(ACCEL_BACKEND_SYSTOLIC_VRL)
@@ -600,7 +949,16 @@ void matmul_backward(float* dinp, float* dweight, float* dbias,
         }
     }
 #endif
-    // backward into weight/bias, parallelize over output channels OC
+    // dweight: accelerated on systolic backends, CPU fallback otherwise
+#if defined(ACCEL_BACKEND_SYSTOLIC) || defined(ACCEL_BACKEND_SYSTOLIC_VRL)
+    accel_matmul_dweight(dweight, inp, dout, B*T, C, OC);
+    // dbias: CPU reduction (not a matmul)
+    if (dbias != NULL)
+        for (int bt = 0; bt < B*T; bt++)
+            for (int o = 0; o < OC; o++)
+                dbias[o] += dout[bt*OC + o];
+#else
+    // Non-systolic: combined dweight + dbias CPU loop
     #pragma omp parallel for
     for (int o = 0; o < OC; o++) {
         for (int b = 0; b < B; b++) {
@@ -610,12 +968,19 @@ void matmul_backward(float* dinp, float* dweight, float* dbias,
                 float* dwrow = dweight + o*C;
                 float d = dout_bt[o];
                 if (dbias != NULL) { dbias[o] += d; }
-                for (int i = 0; i < C; i++) {
+                for (int i = 0; i < C; i++)
                     dwrow[i] += inp_bt[i] * d;
-                }
             }
         }
     }
+#endif
+    {
+        long long _e1_mb = rapl_energy_uj();
+        if (_e0_mb >= 0 && _e1_mb >= 0)
+            g_prof.matmul_energy_uj += (_e1_mb >= _e0_mb) ? (_e1_mb - _e0_mb)
+                                                           : (_e1_mb + (281474976710656LL - _e0_mb));
+    }
+    g_prof.matmul_s += now_s() - _t0_mb;
 }
 
 void attention_forward(float* out, float* preatt, float* att,
@@ -753,8 +1118,6 @@ void attention_backward(float* dinp, float* dpreatt, float* datt,
         }
     }
 }
-
-#define GELU_SCALING_FACTOR sqrtf(2.0f / M_PI)
 
 // =============================================================================
 // ACCEL_FUSED_BIAS_GELU — software model of hardware-fused bias + GELU.
@@ -1312,12 +1675,13 @@ void gpt2_forward(GPT2 *model, int* inputs, int* targets, size_t B, size_t T) {
         float* l_residual3 = acts.residual3 + l * B * T * C;
 
         // now do the forward pass
-        layernorm_forward(l_ln1, l_ln1_mean, l_ln1_rstd, residual, l_ln1w, l_ln1b, B, T, C);
+        double _t0;
+        _t0 = now_s(); layernorm_forward(l_ln1, l_ln1_mean, l_ln1_rstd, residual, l_ln1w, l_ln1b, B, T, C); g_prof.layernorm_s += now_s() - _t0;
         matmul_forward(l_qkv, l_ln1, l_qkvw, l_qkvb, B, T, C, 3*C);
-        attention_forward(l_atty, l_preatt, l_att, l_qkv, B, T, C, NH);
+        _t0 = now_s(); attention_forward(l_atty, l_preatt, l_att, l_qkv, B, T, C, NH); g_prof.attention_s += now_s() - _t0;
         matmul_forward(l_attproj, l_atty, l_attprojw, l_attprojb, B, T, C, C);
         residual_forward(l_residual2, residual, l_attproj, B*T*C);
-        layernorm_forward(l_ln2, l_ln2_mean, l_ln2_rstd, l_residual2, l_ln2w, l_ln2b, B, T, C);
+        _t0 = now_s(); layernorm_forward(l_ln2, l_ln2_mean, l_ln2_rstd, l_residual2, l_ln2w, l_ln2b, B, T, C); g_prof.layernorm_s += now_s() - _t0;
         matmul_forward_gelu(l_fch, l_fch_gelu, l_ln2, l_fcw, l_fcb, B, T, C, 4*C);
         matmul_forward(l_fcproj, l_fch_gelu, l_fcprojw, l_fcprojb, B, T, 4*C, C);
         residual_forward(l_residual3, l_residual2, l_fcproj, B*T*C);
@@ -1441,16 +1805,17 @@ void gpt2_backward(GPT2 *model) {
         float* dl_residual3 = grads_acts.residual3 + l * B * T * C;
 
         // backprop this layer
+        double _t0b;
         residual_backward(dl_residual2, dl_fcproj, dl_residual3, B*T*C);
         matmul_backward(dl_fch_gelu, dl_fcprojw, dl_fcprojb, dl_fcproj, l_fch_gelu, l_fcprojw, B, T, 4*C, C);
-        gelu_backward(dl_fch, l_fch, dl_fch_gelu, B*T*4*C);
+        _t0b = now_s(); gelu_backward(dl_fch, l_fch, dl_fch_gelu, B*T*4*C); g_prof.gelu_bwd_s += now_s() - _t0b;
         matmul_backward(dl_ln2, dl_fcw, dl_fcb, dl_fch, l_ln2, l_fcw, B, T, C, 4*C);
-        layernorm_backward(dl_residual2, dl_ln2w, dl_ln2b, dl_ln2, l_residual2, l_ln2w, l_ln2_mean, l_ln2_rstd, B, T, C);
+        _t0b = now_s(); layernorm_backward(dl_residual2, dl_ln2w, dl_ln2b, dl_ln2, l_residual2, l_ln2w, l_ln2_mean, l_ln2_rstd, B, T, C); g_prof.layernorm_s += now_s() - _t0b;
         residual_backward(dresidual, dl_attproj, dl_residual2, B*T*C);
         matmul_backward(dl_atty, dl_attprojw, dl_attprojb, dl_attproj, l_atty, l_attprojw, B, T, C, C);
-        attention_backward(dl_qkv, dl_preatt, dl_att, dl_atty, l_qkv, l_att, B, T, C, NH);
+        _t0b = now_s(); attention_backward(dl_qkv, dl_preatt, dl_att, dl_atty, l_qkv, l_att, B, T, C, NH); g_prof.attention_s += now_s() - _t0b;
         matmul_backward(dl_ln1, dl_qkvw, dl_qkvb, dl_qkv, l_ln1, l_qkvw, B, T, C, 3*C);
-        layernorm_backward(dresidual, dl_ln1w, dl_ln1b, dl_ln1, residual, l_ln1w, l_ln1_mean, l_ln1_rstd, B, T, C);
+        _t0b = now_s(); layernorm_backward(dresidual, dl_ln1w, dl_ln1b, dl_ln1, residual, l_ln1w, l_ln1_mean, l_ln1_rstd, B, T, C); g_prof.layernorm_s += now_s() - _t0b;
     }
     encoder_backward(grads.wte, grads.wpe, grads_acts.encoded, model->inputs, B, T, C);
 }
@@ -1464,6 +1829,9 @@ void gpt2_update(GPT2 *model, float learning_rate, float beta1, float beta2, flo
         model->v_memory = (float*)calloc(model->num_parameters, sizeof(float));
     }
 
+    float bc1 = 1.0f - powf(beta1, t);
+    float bc2 = 1.0f - powf(beta2, t);
+
     for (size_t i = 0; i < model->num_parameters; i++) {
         float param = model->params_memory[i];
         float grad = model->grads_memory[i];
@@ -1473,8 +1841,8 @@ void gpt2_update(GPT2 *model, float learning_rate, float beta1, float beta2, flo
         // update the second moment (RMSprop)
         float v = beta2 * model->v_memory[i] + (1.0f - beta2) * grad * grad;
         // bias-correct both moments
-        float m_hat = m / (1.0f - powf(beta1, t));
-        float v_hat = v / (1.0f - powf(beta2, t));
+        float m_hat = m / bc1;
+        float v_hat = v / bc2;
 
         // update
         model->m_memory[i] = m;
@@ -1563,8 +1931,15 @@ int main() {
     // ACCEL_SINGLE_PASS limits to one forward+backward step — necessary when
     // running Verilator backends which are orders of magnitude slower than wall time.
 #ifdef ACCEL_SINGLE_PASS
+  #ifdef ACCEL_BACKEND_SYSTOLIC_VRL
+    // VRL simulation is orders of magnitude slower than wall time — no warmup.
     int max_steps = 1;
-    printf("[accel] ACCEL_SINGLE_PASS enabled — running 1 training step only.\n");
+    printf("[accel] ACCEL_SINGLE_PASS enabled — 1 timed step (VRL: no warmup).\n");
+  #else
+    // Warmup step 0 primes caches; only step 1 is measured.
+    int max_steps = 2;
+    printf("[accel] ACCEL_SINGLE_PASS enabled — 1 warmup + 1 timed step.\n");
+  #endif
 #else
     int max_steps = 40;
 #endif
@@ -1625,17 +2000,118 @@ int main() {
         // do a training step
         clock_gettime(CLOCK_MONOTONIC, &start);
         dataloader_next_batch(&train_loader);
+
+        double _fwd_t0 = now_s();
         gpt2_forward(&model, train_loader.inputs, train_loader.targets, B, T);
+        g_prof.fwd_total_s = now_s() - _fwd_t0;
+
         gpt2_zero_grad(&model);
+
+        double _bwd_t0 = now_s();
         gpt2_backward(&model);
+        g_prof.bwd_total_s = now_s() - _bwd_t0;
+
+        double _upd_t0 = now_s();
         gpt2_update(&model, 1e-4f, 0.9f, 0.999f, 1e-8f, 0.0f, step+1);
+        g_prof.other_s += now_s() - _upd_t0;
+
         clock_gettime(CLOCK_MONOTONIC, &end);
         double time_elapsed_s = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
         printf("step %d: train loss %f (took %f ms)\n", step, model.mean_loss, time_elapsed_s * 1000);
+
+#if defined(ACCEL_SINGLE_PASS) && !defined(ACCEL_BACKEND_SYSTOLIC_VRL)
+        if (step == 0) {
+            memset(&g_prof, 0, sizeof(g_prof));
+            accel_reset_timing();
+            printf("[accel] Warmup done — timing counters reset for timed step.\n");
+        }
+#endif
     }
 
-    // report projected hardware time from synthesis parameters
+    // ── Timing breakdown ──────────────────────────────────────────────────────
     accel_print_timing();
+
+    long long hw_fwd = accel_get_hw_cycles_fwd();
+    long long hw_bwd = accel_get_hw_cycles_bwd();
+    double hw_fwd_s  = (double)hw_fwd / 606e6;
+    double hw_bwd_s  = (double)hw_bwd / 606e6;
+    double hw_total_s = hw_fwd_s + hw_bwd_s;
+
+    // cpu_non_matmul: total wall time minus the matmul wrapper time.
+    // On VRL, vrl_matmul_s ≈ matmul_s (Verilator dominates). On software,
+    // matmul_s is the actual CPU matmul time. Either way the subtraction removes it.
+    double cpu_non_matmul_s = g_prof.fwd_total_s + g_prof.bwd_total_s + g_prof.other_s
+                            - g_prof.matmul_s;
+    double cpu_other_s = cpu_non_matmul_s - g_prof.attention_s - g_prof.layernorm_s
+                       - g_prof.gelu_bwd_s;
+    double total_s = hw_total_s + cpu_non_matmul_s;
+
+    printf("\n=== Per-step timing breakdown (1 step, B=%d T=%d) ===\n", B, T);
+    printf("  ── Projected hardware (@ 606 MHz) ──────────────────\n");
+    printf("  Forward  matmul + GELU    : %lld cycles → %.4f s\n", hw_fwd, hw_fwd_s);
+    printf("  Backward dinp + dweight   : %lld cycles → %.4f s\n", hw_bwd, hw_bwd_s);
+    printf("  Total hardware            :              %.4f s\n", hw_total_s);
+    printf("  ── CPU wall time (non-matmul ops) ───────────────────\n");
+    printf("  attention fwd + bwd       : %.4f s\n", g_prof.attention_s);
+    printf("  layernorm fwd + bwd       : %.4f s\n", g_prof.layernorm_s);
+    printf("  gelu_backward             : %.4f s\n", g_prof.gelu_bwd_s);
+    printf("  optimizer + other         : %.4f s\n", cpu_other_s);
+    printf("  Total CPU (non-matmul)    : %.4f s\n", cpu_non_matmul_s);
+    printf("  matmul wall time          : %.4f s\n", g_prof.matmul_s);
+    printf("  ── Projected system total ───────────────────────────\n");
+    printf("  Total (hw + CPU)          : %.4f s\n", total_s);
+    printf("  Accel fraction            : %.1f%%\n", 100.0 * hw_total_s / total_s);
+    printf("  CPU fraction              : %.1f%%\n", 100.0 * cpu_non_matmul_s / total_s);
+#if defined(ACCEL_BACKEND_SYSTOLIC_VRL)
+    printf("  [Verilator sim wall time  : %.4f s]\n", g_prof.vrl_matmul_s);
+#endif
+    printf("=====================================================\n");
+
+    // ── Machine-readable timing file ─────────────────────────────────────────
+    {
+#if defined(ACCEL_BACKEND_SYSTOLIC_VRL)
+        const char* timing_path = "timing_systolic_vrl.txt";
+        const char* backend_name = "systolic_vrl";
+#elif defined(ACCEL_BACKEND_SYSTOLIC)
+        const char* timing_path = "timing_systolic_sw.txt";
+        const char* backend_name = "systolic_sw";
+#elif defined(ACCEL_BACKEND_BF16)
+        const char* timing_path = "timing_bf16.txt";
+        const char* backend_name = "bf16";
+#elif defined(ACCEL_BACKEND_VECT128)
+        const char* timing_path = "timing_vect128.txt";
+        const char* backend_name = "vect128";
+#else
+        const char* timing_path = "timing_software.txt";
+        const char* backend_name = "software";
+#endif
+        FILE* tf = fopen(timing_path, "w");
+        if (tf) {
+            fprintf(tf, "backend=%s\n", backend_name);
+            fprintf(tf, "B=%d\n", B);
+            fprintf(tf, "T=%d\n", T);
+            fprintf(tf, "fwd_total_s=%.6f\n", g_prof.fwd_total_s);
+            fprintf(tf, "bwd_total_s=%.6f\n", g_prof.bwd_total_s);
+            fprintf(tf, "other_s=%.6f\n",     g_prof.other_s);
+            fprintf(tf, "matmul_s=%.6f\n",    g_prof.matmul_s);
+            fprintf(tf, "attention_s=%.6f\n", g_prof.attention_s);
+            fprintf(tf, "layernorm_s=%.6f\n", g_prof.layernorm_s);
+            fprintf(tf, "gelu_bwd_s=%.6f\n",  g_prof.gelu_bwd_s);
+            fprintf(tf, "vrl_matmul_s=%.6f\n",g_prof.vrl_matmul_s);
+            fprintf(tf, "hw_cycles_fwd=%lld\n", hw_fwd);
+            fprintf(tf, "hw_cycles_bwd=%lld\n", hw_bwd);
+            fprintf(tf, "clock_hz=606000000\n");
+            if (g_prof.matmul_energy_uj > 0)
+                fprintf(tf, "matmul_energy_j=%.6f\n",
+                        g_prof.matmul_energy_uj * 1e-6);
+            else
+                fprintf(tf, "matmul_energy_j=-1\n");
+            fclose(tf);
+            printf("[timing] written to %s\n", timing_path);
+        } else {
+            fprintf(stderr, "[timing] WARNING: could not write %s\n", timing_path);
+        }
+    }
 
     // dump weight parameters for comparison with other implementations
     {

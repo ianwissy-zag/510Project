@@ -26,6 +26,9 @@ static VerilatedContext* g_ctx      = nullptr;
 static Vsys_top*         g_dut      = nullptr;
 static long long         g_fwd_tiles = 0;   // K-tiles (forward)
 static long long         g_bwd_tiles = 0;   // K-tiles (backward)
+static long long         g_hw_cycles_fwd = 0;
+static long long         g_hw_cycles_bwd = 0;
+static long long         g_tick_count    = 0;  // total simulated clock cycles
 static int               g_wt_bank   = 0;   // alternates ping/pong each K-tile
 
 // ── Clock / AXI helpers ───────────────────────────────────────────────────────
@@ -33,6 +36,7 @@ static void tick(void) {
     g_dut->clk = 0; g_dut->eval();
     g_dut->clk = 1; g_dut->eval();
     g_dut->clk = 0; g_dut->eval();
+    g_tick_count++;
 }
 
 static void axi_idle(void) {
@@ -52,10 +56,14 @@ static void send_beat(uint8_t tuser, bool tlast, const uint16_t* vals, int n) {
     tick(); axi_idle();
 }
 
-// Send ROWS weight rows (one 512-bit beat per row, 32 BF16 each)
+// Send ROWS weight rows (one 512-bit beat per row, 32 BF16 each).
+// The weight shift chain loads wt_in into PE[0] each cycle and shifts
+// down, so the LAST beat sent ends up in PE[0] and the FIRST in PE[ROWS-1].
+// Sending rows in REVERSE order (ROWS-1 down to 0) ensures PE[r] gets
+// w_tile row r (K-element r), which pairs correctly with the stagger.
 static void send_weight_tile(const bf16_t* w_tile, uint8_t tuser) {
-    for (int r = 0; r < ACCEL_SYS_ROWS; r++) {
-        send_beat(tuser, r == ACCEL_SYS_ROWS - 1,
+    for (int r = ACCEL_SYS_ROWS - 1; r >= 0; r--) {
+        send_beat(tuser, r == 0,
                   (const uint16_t*)(w_tile + r * ACCEL_SYS_COLS),
                   ACCEL_SYS_COLS);
     }
@@ -220,7 +228,18 @@ extern "C" void hal_compute_tile_bwd(const bf16_t*, const bf16_t*, int) {
 // ── Timing ────────────────────────────────────────────────────────────────────
 extern "C" void accel_reset_timing(void) {
     g_fwd_tiles = 0; g_bwd_tiles = 0; g_wt_bank = 0;
+    g_hw_cycles_fwd = 0; g_hw_cycles_bwd = 0; g_tick_count = 0;
 }
+
+extern "C" long long hal_sim_cycle_snapshot(void) { return g_tick_count; }
+
+extern "C" void hal_account_hw_cycles(long long cycles, int mode) {
+    if (mode == 0) g_hw_cycles_fwd += cycles;
+    else           g_hw_cycles_bwd += cycles;
+}
+
+extern "C" long long accel_get_hw_cycles_fwd(void) { return g_hw_cycles_fwd; }
+extern "C" long long accel_get_hw_cycles_bwd(void) { return g_hw_cycles_bwd; }
 
 extern "C" void accel_print_timing(void) {
     // Streaming: LOAD_WT=16 + STREAM=(M+ROWS+2) per K-tile.

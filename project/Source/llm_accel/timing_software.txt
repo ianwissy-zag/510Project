@@ -1,0 +1,15 @@
+backend=software
+B=4
+T=64
+fwd_total_s=1.929382
+bwd_total_s=3.135532
+other_s=0.178234
+matmul_s=4.505519
+attention_s=0.289241
+layernorm_s=0.020175
+gelu_bwd_s=0.056822
+vrl_matmul_s=0.000000
+hw_cycles_fwd=0
+hw_cycles_bwd=0
+clock_hz=606000000
+matmul_energy_j=90.040352

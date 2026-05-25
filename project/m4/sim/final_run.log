@@ -1,0 +1,28 @@
+Test 1: M=4, W=1, act=m+1 → C=ROWS*(m+1)
+  PASS
+Test 2: 2 K-tiles → C=2*ROWS=64
+  PASS
+Test 3: M=16, W=2, act=1 → C=2*ROWS=64
+  PASS
+Test 4: backward, W^T=1, dout=1 → C=ROWS=32
+  PASS
+Test 5: bias=0.5 → C=ROWS+0.5=32.5
+  PASS
+Test 6: no bias, GELU(ROWS=32) → 32.0000
+  PASS
+Test 7: bias=0.5, GELU(ROWS+0.5=32.5) → 32.5000
+  PASS
+Test 8: identity weights, act[m][k]=k+1 → out[m][c]=c+1
+  PASS
+Test 9: M=1 (minimum) → C=ROWS=32
+  PASS
+Test 10: M=64 stress → C=ROWS=32 for all rows
+  PASS
+Test 11: negative activations (act=-1) → C=-ROWS=-32
+  PASS
+Test 12: per-column bias (bias[c]=c+1) → out[m][c]=ROWS+c+1
+  PASS
+Test 13: GELU(-1.0) → expected -0.1588
+  PASS
+
+All 32x32 tests PASSED  (13/13)

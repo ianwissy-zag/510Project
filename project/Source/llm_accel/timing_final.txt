@@ -1,0 +1,35 @@
+
+=== Combined timing projection (B=4 T=64) ===
+  Sources:
+    CPU timing : timing_software.txt  (backend=software)
+    VRL timing : timing_systolic_vrl.txt  (backend=systolic_vrl)
+
+  ── Projected hardware (@ 606 MHz) ────────────────
+  Forward  matmul + GELU    :   45,704,328 cycles → 0.0754 s
+  Backward dinp + dweight   :   94,720,200 cycles → 0.1563 s
+  Total hardware            :               0.2317 s
+
+  ── CPU wall time (non-matmul, from software run) ─
+  attention fwd + bwd       : 0.2892 s
+  layernorm fwd + bwd       : 0.0202 s
+  gelu_backward             : 0.0568 s
+  optimizer + other         : 0.3714 s
+  Total CPU (non-matmul)    : 0.7376 s
+  [CPU matmul ref time      : 4.5055 s]
+
+  ── Projected system total ───────────────────────────
+  Total (hw + CPU)          : 0.9694 s
+  Accel fraction            : 23.9%
+  CPU fraction              : 76.1%
+  Speedup vs CPU-only       : 5.41×
+
+  ── Accelerated-portion speedup (matmul only) ────────
+  CPU matmul time           : 4.5055 s  (from software run)
+  HW matmul time (projected): 0.2317 s  (140,424,528 cycles @ 606 MHz)
+  Speedup on accel portion  : 19.44×
+
+  ── Power & energy (matmul portion) ──────────────────
+  CPU matmul energy         : 90.04 J
+  CPU avg power (matmul)    : 19.98 W
+================================================
+

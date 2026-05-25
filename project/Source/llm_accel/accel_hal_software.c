@@ -30,14 +30,16 @@
 // Systolic backends use 32-column × 16-row tiles; vector backends use 128×32.
 #if defined(ACCEL_BACKEND_SYSTOLIC) || defined(ACCEL_BACKEND_SYSTOLIC_VRL)
 #  define HAL_N  ACCEL_SYS_COLS   // 32 — output channels per tile
-#  define HAL_K  ACCEL_SYS_ROWS   // 16 — inner-product depth per tile
+#  define HAL_K  ACCEL_SYS_ROWS   // 32 — inner-product depth per tile
 #else
 #  define HAL_N  ACCEL_VEC_SIZE   // 128
 #  define HAL_K  ACCEL_K_DEPTH    // 32
 #endif
 
 static float     sw_psum[HAL_N];
-static long long sw_tile_count = 0;
+static long long sw_tile_count  = 0;
+static long long hw_fwd_cycles  = 0;   // accurate: N_tiles*K_tiles*(2*ROWS+M+1)
+static long long hw_bwd_cycles  = 0;
 
 void accel_hal_init(void) {}
 void accel_hal_free(void) {}
@@ -230,11 +232,35 @@ void hal_read_results(float* out) {
     __builtin_memcpy(out, sw_psum, HAL_N * sizeof(float));
 }
 
-void accel_reset_timing(void) { sw_tile_count = 0; }
+void hal_account_hw_cycles(long long cycles, int mode) {
+    if (mode == 0) hw_fwd_cycles += cycles;
+    else           hw_bwd_cycles += cycles;
+}
+long long accel_get_hw_cycles_fwd(void) { return hw_fwd_cycles; }
+long long accel_get_hw_cycles_bwd(void) { return hw_bwd_cycles; }
+long long hal_sim_cycle_snapshot(void)  { return 0; } // no Verilator sim on this backend
+
+void accel_reset_timing(void) {
+    sw_tile_count = 0;
+    hw_fwd_cycles = 0;
+    hw_bwd_cycles = 0;
+}
 
 void accel_print_timing(void) {
-    double cycles   = (double)sw_tile_count * HAL_K;
-    double wall_sec = cycles / 606e6;
-    printf("[accel/software] mode=%-42s tiles=%lld  projected_hw_time=%.4f s\n",
-           prec_name, sw_tile_count, wall_sec);
+    // Legacy pessimistic estimate (25× high — does not account for M-batching)
+    double sw_cycles   = (double)sw_tile_count * HAL_K;
+    double sw_wall_sec = sw_cycles / 606e6;
+
+    // Accurate estimate: N_tiles*K_tiles*(LOAD_WT + M + ROWS + 1) per tile pair
+    double hw_fwd_sec = (double)hw_fwd_cycles / 606e6;
+    double hw_bwd_sec = (double)hw_bwd_cycles / 606e6;
+
+    printf("[accel/software] mode=%s\n", prec_name);
+    printf("  sw_tile_count=%lld  pessimistic_hw_time=%.4f s  (25x overestimate)\n",
+           sw_tile_count, sw_wall_sec);
+    printf("  hw_fwd_cycles=%lld (%.4f s)  hw_bwd_cycles=%lld (%.4f s)"
+           "  total_accel=%.4f s  (@ 606 MHz)\n",
+           hw_fwd_cycles, hw_fwd_sec,
+           hw_bwd_cycles, hw_bwd_sec,
+           hw_fwd_sec + hw_bwd_sec);
 }

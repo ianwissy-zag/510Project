@@ -81,6 +81,18 @@ void hal_compute_tile_bwd(const bf16_t* wT_tile, const bf16_t* dout, int first_t
 void accel_reset_timing(void);
 void accel_print_timing(void);
 
+// Record accurate hardware cycle estimate for a completed matmul tile pass.
+// cycles = N_tiles * K_tiles * (2*ROWS + M + 1)  — one LOAD_WT + one STREAM per tile pair.
+// mode: 0 = forward/dinp, 1 = backward dinp.
+void hal_account_hw_cycles(long long cycles, int mode);
+long long accel_get_hw_cycles_fwd(void);
+long long accel_get_hw_cycles_bwd(void);
+
+// Returns the current simulated clock cycle count (Verilator tick counter).
+// Take a snapshot before and after an operation; the delta is the exact
+// hardware cycle count for that operation.  Returns 0 on non-Verilator backends.
+long long hal_sim_cycle_snapshot(void);
+
 #ifdef __cplusplus
 }
 #endif
