@@ -53,11 +53,12 @@ void hal_read_results(float* out);
 
 // ── Streaming interface (systolic_vrl backend) ────────────────────────────────
 // Loads one K-tile of weights then streams M_count activation rows in one pass.
-// w_tile : SYS_ROWS × SYS_COLS BF16, packed row-major
-// acts   : M_count × SYS_ROWS BF16, one row of K-elements per M row
-// first_k: 1 = reset accumulator (first K-tile), 0 = accumulate
-void hal_stream_tile(const bf16_t* w_tile, const bf16_t* acts,
-                     int M_count, int first_k, int mode);
+// w_tile      : SYS_ROWS × SYS_COLS BF16, packed row-major
+// next_w_tile : next tile's weights (preloaded during LOAD_WT); NULL for last tile
+// acts        : M_count × SYS_ROWS BF16, one row of K-elements per M row
+// first_k     : 1 = reset accumulator (first K-tile), 0 = accumulate
+void hal_stream_tile(const bf16_t* w_tile, const bf16_t* next_w_tile,
+                     const bf16_t* acts, int M_count, int first_k, int mode);
 
 // Load N FP32 bias values into the hardware bias SRAM (N must equal SYS_COLS).
 // Must be called before any readback that uses apply_bias=1.

@@ -19,6 +19,10 @@ Both files are written automatically by train_gpt2 at end of run.
 import sys
 import os
 
+# Synthesis power for the 32×32 systolic array (ASAP7 7nm RVT, 606 MHz).
+# Source: m4/synth/power_report.txt — register + logic total, active stimulus.
+HW_SYNTH_POWER_W = 0.900371
+
 
 def read_timing(path):
     d = {}
@@ -118,13 +122,30 @@ def main():
     print()
     print(f"  ── Power & energy (matmul portion) ──────────────────")
     cpu_energy_j = get_float(cpu, 'matmul_energy_j', -1.0)
+    hw_energy_j  = HW_SYNTH_POWER_W * hw_total_s if hw_total_s > 0 else 0.0
+
     if cpu_energy_j > 0 and cpu_matmul > 0:
         cpu_avg_power_w = cpu_energy_j / cpu_matmul
-        print(f"  CPU matmul energy         : {cpu_energy_j:.2f} J")
+        print(f"  CPU matmul energy (RAPL)  : {cpu_energy_j:.3f} J")
         print(f"  CPU avg power (matmul)    : {cpu_avg_power_w:.2f} W")
     else:
         print(f"  CPU matmul energy         : not available")
         print(f"  (re-run software backend after: sudo chmod o+r /sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj)")
+
+    if hw_total_s > 0:
+        print(f"  HW matmul energy (synth)  : {hw_energy_j:.4f} J"
+              f"  ({HW_SYNTH_POWER_W:.3f} W × {hw_total_s:.4f} s)")
+
+    if cpu_energy_j > 0 and hw_energy_j > 0:
+        power_reduction  = cpu_avg_power_w / HW_SYNTH_POWER_W
+        energy_reduction = cpu_energy_j    / hw_energy_j
+        print()
+        print(f"  ── Energy cost reduction ────────────────────────────")
+        print(f"  Power reduction           : {power_reduction:.1f}×"
+              f"  ({cpu_avg_power_w:.1f} W → {HW_SYNTH_POWER_W:.3f} W)")
+        print(f"  Energy reduction          : {energy_reduction:.0f}×"
+              f"  ({cpu_energy_j:.1f} J → {hw_energy_j:.4f} J)")
+        print(f"  = {power_reduction:.1f}× lower power  ×  {cpu_matmul/hw_total_s:.1f}× speedup")
     print(f"================================================\n")
 
 

@@ -217,6 +217,7 @@ void layernorm_backward(float* dinp, float* dweight, float* dbias,
 // Loop order: (N-tile, K-tile) outer; M rows handled inside hal_stream_tile.
 // Static buffers avoid stack pressure for large M.
 static bf16_t s_w_tile[ACCEL_SYS_ROWS * ACCEL_SYS_COLS];
+static bf16_t s_w_tile_next[ACCEL_SYS_ROWS * ACCEL_SYS_COLS];
 static bf16_t s_acts_all[256 * ACCEL_SYS_ROWS];   // M_max=256 rows × K_DEPTH
 static float  s_result_all[256 * ACCEL_SYS_COLS];  // M_max=256 rows × N_TILE
 
@@ -242,13 +243,24 @@ static void accel_matmul(float* out, const float* inp, const float* weight,
                     s_w_tile[k * TILE_N + n] =
                         float_to_bf16(weight[(n_base + n) * K + k_base + k]);
 
+            // Pack next K-tile's weights for LOAD_WT preloading
+            const bf16_t* next_w = NULL;
+            if (kt + 1 < K_tiles) {
+                int k_next = (kt + 1) * TILE_K;
+                for (int k = 0; k < TILE_K; k++)
+                    for (int n = 0; n < TILE_N; n++)
+                        s_w_tile_next[k * TILE_N + n] =
+                            float_to_bf16(weight[(n_base + n) * K + k_next + k]);
+                next_w = s_w_tile_next;
+            }
+
             // Pack all M rows' activation slice for this K-tile
             for (int m = 0; m < M; m++)
                 for (int k = 0; k < TILE_K; k++)
                     s_acts_all[m * TILE_K + k] =
                         float_to_bf16(inp[m * K + k_base + k]);
 
-            hal_stream_tile(s_w_tile, s_acts_all, M, first_k, 0);
+            hal_stream_tile(s_w_tile, next_w, s_acts_all, M, first_k, 0);
         }
 
         if (K_tiles > 0) {
@@ -311,11 +323,20 @@ static void accel_matmul_gelu(float* out_raw, float* out_gelu,
                 for (int n = 0; n < TILE_N; n++)
                     s_w_tile[k * TILE_N + n] =
                         float_to_bf16(weight[(n_base + n) * K + k_base + k]);
+            const bf16_t* next_w = NULL;
+            if (kt + 1 < K_tiles) {
+                int k_next = (kt + 1) * TILE_K;
+                for (int k = 0; k < TILE_K; k++)
+                    for (int n = 0; n < TILE_N; n++)
+                        s_w_tile_next[k * TILE_N + n] =
+                            float_to_bf16(weight[(n_base + n) * K + k_next + k]);
+                next_w = s_w_tile_next;
+            }
             for (int m = 0; m < M; m++)
                 for (int k = 0; k < TILE_K; k++)
                     s_acts_all[m * TILE_K + k] =
                         float_to_bf16(inp[m * K + k_base + k]);
-            hal_stream_tile(s_w_tile, s_acts_all, M, first_k, 0);
+            hal_stream_tile(s_w_tile, next_w, s_acts_all, M, first_k, 0);
         }
 
         if (K_tiles > 0) {
@@ -506,6 +527,7 @@ static void accel_matmul_backward_dinp(float* dinp, const float* dout,
 #if defined(ACCEL_BACKEND_SYSTOLIC_VRL)
     // Streaming backward: all M rows per (K-tile, N-tile) pass
     static bf16_t s_wT_tile[ACCEL_SYS_ROWS * ACCEL_SYS_COLS];
+    static bf16_t s_wT_tile_next[ACCEL_SYS_ROWS * ACCEL_SYS_COLS];
     static bf16_t s_dout_all[256 * ACCEL_SYS_ROWS];
     static float  s_dinp_all[256 * ACCEL_SYS_COLS];
 
@@ -518,11 +540,20 @@ static void accel_matmul_backward_dinp(float* dinp, const float* dout,
                 for (int k = 0; k < TILE_N; k++)
                     s_wT_tile[n * TILE_N + k] =
                         float_to_bf16(weight[(n_base+n)*K + k_base+k]);
+            const bf16_t* next_wT = NULL;
+            if (nt + 1 < N_tiles) {
+                int n_next = (nt + 1) * TILE_K;
+                for (int n = 0; n < TILE_K; n++)
+                    for (int k = 0; k < TILE_N; k++)
+                        s_wT_tile_next[n * TILE_N + k] =
+                            float_to_bf16(weight[(n_next+n)*K + k_base+k]);
+                next_wT = s_wT_tile_next;
+            }
             for (int m = 0; m < M; m++)
                 for (int n = 0; n < TILE_K; n++)
                     s_dout_all[m * TILE_K + n] =
                         float_to_bf16(dout[m*N + n_base+n]);
-            hal_stream_tile(s_wT_tile, s_dout_all, M, first_n, 1);
+            hal_stream_tile(s_wT_tile, next_wT, s_dout_all, M, first_n, 1);
         }
         if (N_tiles > 0) {
             hal_read_results_all(s_dinp_all, M);
@@ -672,11 +703,20 @@ static void accel_matmul_dweight(float* dweight, const float* inp, const float* 
                     for (int n = 0; n < TILE_N; n++)
                         s_w_tile[k * TILE_N + n] =
                             float_to_bf16(dout[(m_base + k) * OC + oc_base + n]);
+                const bf16_t* next_w = NULL;
+                if (kt + 1 < M_chunks) {
+                    int m_next = (kt + 1) * TILE_K;
+                    for (int k = 0; k < TILE_K; k++)
+                        for (int n = 0; n < TILE_N; n++)
+                            s_w_tile_next[k * TILE_N + n] =
+                                float_to_bf16(dout[(m_next + k) * OC + oc_base + n]);
+                    next_w = s_w_tile_next;
+                }
                 for (int ci = 0; ci < c_count; ci++)
                     for (int k = 0; k < TILE_K; k++)
                         s_acts_all[ci * TILE_K + k] =
                             float_to_bf16(inp[(m_base + k) * C + c_start + ci]);
-                hal_stream_tile(s_w_tile, s_acts_all, c_count, first_k, 0);
+                hal_stream_tile(s_w_tile, next_w, s_acts_all, c_count, first_k, 0);
             }
             if (M_chunks > 0) {
                 hal_read_results_all(s_result_all, c_count);

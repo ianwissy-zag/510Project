@@ -2,6 +2,14 @@
 
 Ian Wyse — ECE 510 Spring 2026
 
+## Summary
+
+Custom ASIC accelerator for the GEMM kernel that accounts for 86% of GPT-2 training runtime. The final design is a 32×32 BF16 weight-stationary systolic array targeting ASAP7 7nm at 606 MHz, delivering 563 GFLOP/s effective throughput with a 432× energy reduction over the CPU baseline. All 16 directed simulation tests pass; synthesis yields 0.385 mm² at 0.900 W with 154 minor timing violations confined to the GELU post-processing pipeline (WNS = −0.9 ps).
+
+**[M4 Milestone deliverables →](project/m4/README.md)**
+
+---
+
 ## Project Overview
 
 This project implements and evaluates custom ASIC accelerators for the matrix multiply (GEMM) operations that dominate GPT-2 training. Three accelerator architectures are developed, all targeting the ASAP7 predictive 7nm PDK via the Cadence Genus/Innovus toolchain. The designs are integrated with a modified GPT-2 C training loop (`Source/llm_accel/`) that replaces the CPU matmul with accelerator calls through a hardware abstraction layer supporting software simulation and Verilator-backed cycle-accurate simulation.

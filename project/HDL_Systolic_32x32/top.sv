@@ -12,8 +12,8 @@
 //      Readback streams 2×M_count processed beats.
 //
 // AXI tuser encoding:
-//   3'b000/001 = forward weight ping/pong
-//   3'b010/011 = backward weight ping/pong
+//   3'b000/010 = weight ping  (bank 0, forward or backward)
+//   3'b001/011 = weight pong  (bank 1, forward or backward)
 //   3'b100     = activation (one beat per M row, full 512 bits used)
 //   3'b110     = bias (2 beats: beat 0 → bias[0..15], beat 1 → bias[16..31])
 
@@ -43,8 +43,7 @@ module sys_top #(
     input  logic                start,
     input  logic                mode,
     input  logic                first_k_tile,
-    input  logic                fwd_buf_sel,
-    input  logic                bwd_buf_sel,
+    input  logic                buf_sel,
     input  logic [M_ADDR_W-1:0] M_count,
     output logic                done,
 
@@ -61,14 +60,10 @@ module sys_top #(
     output logic                  m_axis_tlast
 );
     // ── Internal ──────────────────────────────────────────────────────────────
-    logic [ADDR_WIDTH-1:0]     fwd_wt_addr_0, fwd_wt_addr_1;
-    logic [ADDR_WIDTH-1:0]     bwd_wt_addr_0, bwd_wt_addr_1;
-    logic                      fwd_wt_re_0, fwd_wt_re_1;
-    logic                      bwd_wt_re_0, bwd_wt_re_1;
-    logic [COLS*WT_WIDTH-1:0]  fwd_wt_rdata_0, fwd_wt_rdata_1;
-    logic [COLS*WT_WIDTH-1:0]  bwd_wt_rdata_0, bwd_wt_rdata_1;
-    logic                      fwd_wt_we_0, fwd_wt_we_1;
-    logic                      bwd_wt_we_0, bwd_wt_we_1;
+    logic [ADDR_WIDTH-1:0]     wt_addr_0, wt_addr_1;
+    logic                      wt_re_0, wt_re_1;
+    logic [COLS*WT_WIDTH-1:0]  wt_rdata_0, wt_rdata_1;
+    logic                      wt_we_0, wt_we_1;
     logic [ADDR_WIDTH-1:0]     axi_wt_addr;
     logic [COLS*WT_WIDTH-1:0]  axi_wt_data;
 
@@ -100,31 +95,21 @@ module sys_top #(
         .s_axis_tdata(s_axis_tdata), .s_axis_tuser(s_axis_tuser),
         .s_axis_tvalid(s_axis_tvalid), .s_axis_tready(s_axis_tready),
         .s_axis_tlast(s_axis_tlast),
-        .fwd_wt_we_0(fwd_wt_we_0), .fwd_wt_we_1(fwd_wt_we_1),
-        .fwd_wt_addr(axi_wt_addr),  .fwd_wt_data(axi_wt_data),
-        .bwd_wt_we_0(bwd_wt_we_0), .bwd_wt_we_1(bwd_wt_we_1),
-        .bwd_wt_addr(), .bwd_wt_data(),
+        .wt_we_0(wt_we_0), .wt_we_1(wt_we_1),
+        .wt_addr(axi_wt_addr), .wt_data(axi_wt_data),
         .act_we_0(act_we), .act_we_1(), .act_data(act_data),
         .bias_we(bias_we), .bias_beat_sel(bias_beat_sel), .bias_data(bias_data_axi)
     );
 
-    // ── Weight SRAMs ─────────────────────────────────────────────────────────
-    weight_sram #(.COLS(COLS),.WT_WIDTH(WT_WIDTH),.DEPTH(ROWS)) u_fwd_wt_0 (
-        .clk(clk), .we(fwd_wt_we_0),
-        .addr(fwd_wt_we_0 ? axi_wt_addr : fwd_wt_addr_0),
-        .wdata(axi_wt_data), .rdata(fwd_wt_rdata_0));
-    weight_sram #(.COLS(COLS),.WT_WIDTH(WT_WIDTH),.DEPTH(ROWS)) u_fwd_wt_1 (
-        .clk(clk), .we(fwd_wt_we_1),
-        .addr(fwd_wt_we_1 ? axi_wt_addr : fwd_wt_addr_1),
-        .wdata(axi_wt_data), .rdata(fwd_wt_rdata_1));
-    weight_sram #(.COLS(COLS),.WT_WIDTH(WT_WIDTH),.DEPTH(ROWS)) u_bwd_wt_0 (
-        .clk(clk), .we(bwd_wt_we_0),
-        .addr(bwd_wt_we_0 ? axi_wt_addr : bwd_wt_addr_0),
-        .wdata(axi_wt_data), .rdata(bwd_wt_rdata_0));
-    weight_sram #(.COLS(COLS),.WT_WIDTH(WT_WIDTH),.DEPTH(ROWS)) u_bwd_wt_1 (
-        .clk(clk), .we(bwd_wt_we_1),
-        .addr(bwd_wt_we_1 ? axi_wt_addr : bwd_wt_addr_1),
-        .wdata(axi_wt_data), .rdata(bwd_wt_rdata_1));
+    // ── Weight SRAMs (shared ping/pong for forward and backward) ─────────────
+    weight_sram #(.COLS(COLS),.WT_WIDTH(WT_WIDTH),.DEPTH(ROWS)) u_wt_0 (
+        .clk(clk), .we(wt_we_0),
+        .addr(wt_we_0 ? axi_wt_addr : wt_addr_0),
+        .wdata(axi_wt_data), .rdata(wt_rdata_0));
+    weight_sram #(.COLS(COLS),.WT_WIDTH(WT_WIDTH),.DEPTH(ROWS)) u_wt_1 (
+        .clk(clk), .we(wt_we_1),
+        .addr(wt_we_1 ? axi_wt_addr : wt_addr_1),
+        .wdata(axi_wt_data), .rdata(wt_rdata_1));
 
     // ── Bias SRAM ─────────────────────────────────────────────────────────────
     bias_sram #(.COLS(COLS), .DATA_WIDTH(PSUM_WIDTH)) u_bias (
@@ -160,14 +145,11 @@ module sys_top #(
     u_ctrl (
         .clk(clk), .rst_n(rst_n),
         .start(start), .mode(mode), .first_k_tile(first_k_tile),
-        .fwd_buf_sel(fwd_buf_sel), .bwd_buf_sel(bwd_buf_sel),
+        .buf_sel(buf_sel),
         .M_count(M_count), .done(done),
-        .fwd_wt_addr_0(fwd_wt_addr_0), .fwd_wt_addr_1(fwd_wt_addr_1),
-        .fwd_wt_re_0(fwd_wt_re_0), .fwd_wt_re_1(fwd_wt_re_1),
-        .fwd_wt_rdata_0(fwd_wt_rdata_0), .fwd_wt_rdata_1(fwd_wt_rdata_1),
-        .bwd_wt_addr_0(bwd_wt_addr_0), .bwd_wt_addr_1(bwd_wt_addr_1),
-        .bwd_wt_re_0(bwd_wt_re_0), .bwd_wt_re_1(bwd_wt_re_1),
-        .bwd_wt_rdata_0(bwd_wt_rdata_0), .bwd_wt_rdata_1(bwd_wt_rdata_1),
+        .wt_addr_0(wt_addr_0), .wt_addr_1(wt_addr_1),
+        .wt_re_0(wt_re_0), .wt_re_1(wt_re_1),
+        .wt_rdata_0(wt_rdata_0), .wt_rdata_1(wt_rdata_1),
         .load_wt(load_wt), .wt_in(wt_in),
         .psum_in(psum_in), .psum_out(psum_out),
         .stagger_en(stagger_en),

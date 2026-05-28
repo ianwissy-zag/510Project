@@ -40,20 +40,14 @@ module controller #(
     input  logic                  start,
     input  logic                  mode,         // 0=forward, 1=backward dinp
     input  logic                  first_k_tile, // 1→seed psum from zero
-    input  logic                  fwd_buf_sel,
-    input  logic                  bwd_buf_sel,
+    input  logic                  buf_sel,      // selects ping (0) or pong (1) weight bank
     input  logic [M_ADDR_W-1:0]   M_count,      // number of M rows to stream
     output logic                  done,
 
-    // Forward weight SRAM read (ping/pong)
-    output logic [ADDR_WIDTH-1:0]      fwd_wt_addr_0, fwd_wt_addr_1,
-    output logic                       fwd_wt_re_0,   fwd_wt_re_1,
-    input  logic [COLS*WT_WIDTH-1:0]   fwd_wt_rdata_0, fwd_wt_rdata_1,
-
-    // Backward weight SRAM read (ping/pong)
-    output logic [ADDR_WIDTH-1:0]      bwd_wt_addr_0, bwd_wt_addr_1,
-    output logic                       bwd_wt_re_0,   bwd_wt_re_1,
-    input  logic [COLS*WT_WIDTH-1:0]   bwd_wt_rdata_0, bwd_wt_rdata_1,
+    // Weight SRAM read (shared ping/pong for forward and backward)
+    output logic [ADDR_WIDTH-1:0]      wt_addr_0, wt_addr_1,
+    output logic                       wt_re_0,   wt_re_1,
+    input  logic [COLS*WT_WIDTH-1:0]   wt_rdata_0, wt_rdata_1,
 
     // Systolic array weight input and psum
     output logic                           load_wt,
@@ -80,12 +74,7 @@ module controller #(
 
     // ── Weight SRAM mux ───────────────────────────────────────────────────────
     logic [COLS*WT_WIDTH-1:0] wt_rdata_mux;
-    always_comb begin
-        if (!mode)
-            wt_rdata_mux = fwd_buf_sel ? fwd_wt_rdata_1 : fwd_wt_rdata_0;
-        else
-            wt_rdata_mux = bwd_buf_sel ? bwd_wt_rdata_1 : bwd_wt_rdata_0;
-    end
+    assign wt_rdata_mux = buf_sel ? wt_rdata_1 : wt_rdata_0;
 
     genvar c;
     generate
@@ -94,18 +83,14 @@ module controller #(
     endgenerate
 
     // ── Weight SRAM addresses / read enables ─────────────────────────────────
-    assign fwd_wt_addr_0 = wt_cnt;
-    assign fwd_wt_addr_1 = wt_cnt;
-    assign bwd_wt_addr_0 = wt_cnt;
-    assign bwd_wt_addr_1 = wt_cnt;
+    assign wt_addr_0 = wt_cnt;
+    assign wt_addr_1 = wt_cnt;
 
     logic in_load;
     assign in_load = (state == LOAD_WT);
 
-    assign fwd_wt_re_0 = in_load && !mode && !fwd_buf_sel;
-    assign fwd_wt_re_1 = in_load && !mode &&  fwd_buf_sel;
-    assign bwd_wt_re_0 = in_load &&  mode && !bwd_buf_sel;
-    assign bwd_wt_re_1 = in_load &&  mode &&  bwd_buf_sel;
+    assign wt_re_0 = in_load && !buf_sel;
+    assign wt_re_1 = in_load &&  buf_sel;
 
     assign load_wt    = in_load;
     assign stagger_en = (state == STREAM);

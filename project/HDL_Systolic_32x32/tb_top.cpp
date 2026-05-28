@@ -10,6 +10,9 @@
 // Test 11:    negative activations — act=-1 → C=-ROWS (BF16 sign handling)
 // Test 12:    per-column bias — bias[c]=c+1, verifies each column gets its own bias
 // Test 13:    GELU on negative raw value — W=-1/32, act=1 → raw=-1, GELU(-1)≈-0.159
+// Test 14:    M=256 (M_MAX boundary) — full accumulator depth
+// Test 15:    4 K-tile accumulation — verifies multi-tile accumulation beyond 2 tiles
+// Test 16:    ping-pong preloading — next tile loaded into idle bank during LOAD_WT
 //
 // NOTE: send_weights sends rows in REVERSE order (ROWS-1→0).  The weight shift
 // chain loads wt_in into PE[0] each cycle and shifts down, so the last beat sent
@@ -52,7 +55,7 @@ static void send_beat(uint8_t tuser, bool tlast, const uint16_t* vals, int n) {
     tick(); axi_idle();
 }
 
-// Send ROWS weight rows (BF16 weights, tuser=bank or 2+bank for backward).
+// Send ROWS weight rows (BF16 weights, tuser=bank).
 // Sends rows in REVERSE order (r = ROWS-1 down to 0) so that after the
 // top-to-bottom shift chain PE[r] holds w_tile row r (K-element r).
 static void send_weights(const float* w_tile, uint8_t tuser) {
@@ -63,6 +66,17 @@ static void send_weights(const float* w_tile, uint8_t tuser) {
         send_beat(tuser, r == 0, row, COLS);
     }
     tick(); tick();
+}
+
+// Like send_weights but without the trailing idle ticks — exactly ROWS beats.
+// Used for ping-pong preloading where the send must fit within LOAD_WT (ROWS cycles).
+static void send_weights_nowait(const float* w_tile, uint8_t tuser) {
+    const int ROWS = 32, COLS = 32;
+    for (int r = ROWS - 1; r >= 0; r--) {
+        uint16_t row[COLS];
+        for (int c = 0; c < COLS; c++) row[c] = f2bf(w_tile[r*COLS+c]);
+        send_beat(tuser, r == 0, row, COLS);
+    }
 }
 
 // Send 32 FP32 bias values as 2 AXI beats (tuser=6 = 0b110)
@@ -122,12 +136,10 @@ static void readback(float* out, int M_count, bool apply_bias, bool apply_gelu) 
 static void run_k_tile(const float* w_tile, const float* acts_flat,
                         int M_count, bool first_k, int wt_bank, int mode) {
     const int ROWS = 32;
-    uint8_t wt_tuser = (mode==0) ? (uint8_t)wt_bank : (uint8_t)(2+wt_bank);
-    send_weights(w_tile, wt_tuser);
+    send_weights(w_tile, (uint8_t)wt_bank);
     dut->mode         = mode;
     dut->first_k_tile = first_k ? 1 : 0;
-    dut->fwd_buf_sel  = (mode==0) ? wt_bank : 0;
-    dut->bwd_buf_sel  = (mode==1) ? wt_bank : 0;
+    dut->buf_sel      = wt_bank;
     dut->M_count      = (uint16_t)M_count;
     dut->start = 1; tick(); dut->start = 0;
     for (int i = 0; i < ROWS; i++) tick();
@@ -162,7 +174,7 @@ int main() {
     tfp->open("waves.fst");
 
     dut->rst_n=0; dut->start=0; dut->mode=0;
-    dut->first_k_tile=1; dut->fwd_buf_sel=0; dut->bwd_buf_sel=0;
+    dut->first_k_tile=1; dut->buf_sel=0;
     dut->M_count=4; dut->rb_start=0; dut->m_axis_tready=0;
     dut->apply_bias=0; dut->apply_gelu=0;
     axi_idle();
@@ -373,9 +385,85 @@ int main() {
         all_pass &= ok; printf("  %s\n", ok?"PASS":"FAIL");
     }
 
-    printf("\nAll 32x32 tests %s  (%d/13)\n",
+    // ── Test 14: M=256 (M_MAX boundary) ──────────────────────────────────────
+    // Fills the accumulator SRAM to its maximum depth.  Checks first, last,
+    // and boundary rows to verify the M_ADDR_W counter rolls over correctly.
+    {
+        float w[ROWS*COLS]; for (int i=0;i<ROWS*COLS;i++) w[i]=1.f;
+        float acts[256*ROWS]; for (int i=0;i<256*ROWS;i++) acts[i]=1.f;
+        run_k_tile(w, acts, 256, true, 0, 0);
+        readback(out, 256, false, false);
+        printf("Test 14: M=256 (M_MAX) → C=ROWS=%d for all rows\n", ROWS);
+        int ok=1;
+        int rows14[] = {0, 1, 127, 128, 254, 255};
+        for (int ri=0;ri<6;ri++) {
+            int m=rows14[ri]; char l[32]; snprintf(l,32,"C[%d][0]",m);
+            ok &= chk(l, out[m*COLS], (float)ROWS);
+        }
+        all_pass &= ok; printf("  %s\n", ok?"PASS":"FAIL");
+    }
+
+    // ── Test 15: 4 K-tile accumulation ───────────────────────────────────────
+    // Accumulates across 4 K-tiles with alternating ping-pong banks.
+    // Each tile contributes ROWS=32, so expected output = 4*ROWS=128.
+    // Extends Test 2 (which covers only 2 tiles) to catch carry or overflow
+    // bugs that emerge after the third and fourth accumulation steps.
+    {
+        float w[ROWS*COLS]; for (int i=0;i<ROWS*COLS;i++) w[i]=1.f;
+        float acts[4*ROWS]; for (int i=0;i<4*ROWS;i++) acts[i]=1.f;
+        run_k_tile(w, acts, 4, true,  0, 0);
+        run_k_tile(w, acts, 4, false, 1, 0);
+        run_k_tile(w, acts, 4, false, 0, 0);
+        run_k_tile(w, acts, 4, false, 1, 0);
+        readback(out, 4, false, false);
+        printf("Test 15: 4 K-tiles → C=4*ROWS=%d\n", 4*ROWS);
+        int ok=1;
+        for (int m=0;m<4;m++) { char l[32]; snprintf(l,32,"C[%d][0]",m);
+            ok &= chk(l, out[m*COLS], (float)(4*ROWS), 1.0f); }
+        all_pass &= ok; printf("  %s\n", ok?"PASS":"FAIL");
+    }
+
+    // ── Test 16: ping-pong preloading ────────────────────────────────────────
+    // Verifies that writing next-tile weights into the idle bank during LOAD_WT
+    // does not corrupt the active computation, and that the preloaded weights
+    // are subsequently read correctly for the next K-tile.
+    //
+    // Tile 0: W=1 → bank 0; during its LOAD_WT, stream W=2 → bank 1 (preload).
+    // Tile 1: weights already in bank 1 (no resend); buf_sel=1, first_k=false.
+    // Expected: ROWS*1 + ROWS*2 = ROWS*3 = 96.
+    {
+        float w1[ROWS*COLS]; for (int i=0;i<ROWS*COLS;i++) w1[i]=1.f;
+        float w2[ROWS*COLS]; for (int i=0;i<ROWS*COLS;i++) w2[i]=2.f;
+        float acts[4*ROWS]; for (int i=0;i<4*ROWS;i++) acts[i]=1.f;
+
+        // Tile 0: send W=1 into bank 0, start, preload W=2 into bank 1 during LOAD_WT
+        send_weights(w1, 0);
+        dut->mode = 0; dut->first_k_tile = 1; dut->buf_sel = 0; dut->M_count = 4;
+        dut->start = 1; tick(); dut->start = 0;
+        send_weights_nowait(w2, 1);   // exactly ROWS beats, fits within LOAD_WT
+        for (int m=0;m<4;m++) send_act_beat(acts + m*ROWS, m==3);
+        if (!wait_done(4 + ROWS + 20)) fprintf(stderr, "  WARNING: done not asserted\n");
+        tick();
+
+        // Tile 1: bank 1 already holds W=2; skip weight send, let LOAD_WT read it
+        dut->first_k_tile = 0; dut->buf_sel = 1; dut->M_count = 4;
+        dut->start = 1; tick(); dut->start = 0;
+        for (int i=0;i<ROWS;i++) tick();   // LOAD_WT reads preloaded W=2 from bank 1
+        for (int m=0;m<4;m++) send_act_beat(acts + m*ROWS, m==3);
+        if (!wait_done(4 + ROWS + 20)) fprintf(stderr, "  WARNING: done not asserted\n");
+        tick();
+
+        readback(out, 4, false, false);
+        printf("Test 16: ping-pong preload (W=1 bank0 + preload W=2 bank1) → C=3*ROWS=%d\n", 3*ROWS);
+        int ok=1;
+        for (int m=0;m<4;m++) { char l[32]; snprintf(l,32,"C[%d][0]",m);
+            ok &= chk(l, out[m*COLS], (float)(3*ROWS), 1.0f); }
+        all_pass &= ok; printf("  %s\n", ok?"PASS":"FAIL");
+    }
+
+    printf("\nAll 32x32 tests %s  (%d/16)\n",
            all_pass ? "PASSED" : "FAILED",
-           all_pass ? 13 : 0);
+           all_pass ? 16 : 0);
     tfp->close(); delete tfp;
     dut->final(); delete dut;
     return all_pass ? 0 : 1;

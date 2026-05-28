@@ -29,7 +29,8 @@ static long long         g_bwd_tiles = 0;   // K-tiles (backward)
 static long long         g_hw_cycles_fwd = 0;
 static long long         g_hw_cycles_bwd = 0;
 static long long         g_tick_count    = 0;  // total simulated clock cycles
-static int               g_wt_bank   = 0;   // alternates ping/pong each K-tile
+static int               g_wt_bank        = 0;  // alternates ping/pong each K-tile
+static bool              g_wt_preloaded   = false; // current tile already in SRAM
 
 // ── Clock / AXI helpers ───────────────────────────────────────────────────────
 static void tick(void) {
@@ -85,8 +86,7 @@ extern "C" void accel_hal_init(void) {
     g_dut->start         = 0;
     g_dut->mode          = 0;
     g_dut->first_k_tile  = 1;
-    g_dut->fwd_buf_sel   = 0;
-    g_dut->bwd_buf_sel   = 0;
+    g_dut->buf_sel       = 0;
     g_dut->M_count       = 1;
     g_dut->rb_start      = 0;
     g_dut->m_axis_tready = 0;
@@ -103,24 +103,33 @@ extern "C" void accel_hal_free(void) {
 // ── Streaming K-tile ─────────────────────────────────────────────────────────
 // Loads weights then streams M_count activation rows.
 // mode: 0=forward (tuser=0/1), 1=backward (tuser=2/3)
-extern "C" void hal_stream_tile(const bf16_t* w_tile, const bf16_t* acts,
-                                 int M_count, int first_k, int mode) {
+extern "C" void hal_stream_tile(const bf16_t* w_tile, const bf16_t* next_w_tile,
+                                 const bf16_t* acts, int M_count, int first_k, int mode) {
     int bank = g_wt_bank;
-    uint8_t wt_tuser = (mode == 0) ? (uint8_t)bank : (uint8_t)(2 + bank);
+    uint8_t wt_tuser = (uint8_t)bank;
 
-    // Load weight tile into hardware SRAM
-    send_weight_tile(w_tile, wt_tuser);
+    // Load current tile's weights only if not already preloaded during previous LOAD_WT.
+    if (!g_wt_preloaded)
+        send_weight_tile(w_tile, wt_tuser);
+    g_wt_preloaded = false;
 
     // Trigger LOAD_WT → STREAM
     g_dut->mode        = mode;
     g_dut->first_k_tile = first_k ? 1 : 0;
-    g_dut->fwd_buf_sel  = (mode == 0) ? bank : 0;
-    g_dut->bwd_buf_sel  = (mode == 1) ? bank : 0;
+    g_dut->buf_sel      = bank;
     g_dut->M_count      = (uint16_t)M_count;  // 9-bit port, needs uint16_t not uint8_t
     g_dut->start = 1; tick(); g_dut->start = 0;
 
-    // Wait for LOAD_WT (ROWS cycles)
-    for (int i = 0; i < ACCEL_SYS_ROWS; i++) tick();
+    // During LOAD_WT (ROWS cycles): preload next tile into the idle ping-pong bank.
+    // send_weight_tile issues exactly ROWS beats, matching LOAD_WT duration perfectly.
+    if (next_w_tile) {
+        int next_bank = bank ^ 1;
+        uint8_t next_tuser = (uint8_t)next_bank;
+        send_weight_tile(next_w_tile, next_tuser);
+        g_wt_preloaded = true;
+    } else {
+        for (int i = 0; i < ACCEL_SYS_ROWS; i++) tick();
+    }
 
     // Stream M_count activation beats — one per cycle, tuser=100
     for (int m = 0; m < M_count; m++) {
@@ -227,7 +236,7 @@ extern "C" void hal_compute_tile_bwd(const bf16_t*, const bf16_t*, int) {
 
 // ── Timing ────────────────────────────────────────────────────────────────────
 extern "C" void accel_reset_timing(void) {
-    g_fwd_tiles = 0; g_bwd_tiles = 0; g_wt_bank = 0;
+    g_fwd_tiles = 0; g_bwd_tiles = 0; g_wt_bank = 0; g_wt_preloaded = false;
     g_hw_cycles_fwd = 0; g_hw_cycles_bwd = 0; g_tick_count = 0;
 }
 

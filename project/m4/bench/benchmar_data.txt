@@ -1,3 +1,33 @@
+backend=software
+B=4
+T=64
+fwd_total_s=1.131601
+bwd_total_s=3.900215
+other_s=0.955441
+matmul_s=4.225683
+attention_s=0.293055
+layernorm_s=0.028825
+gelu_bwd_s=0.040315
+vrl_matmul_s=0.000000
+hw_cycles_fwd=0
+hw_cycles_bwd=0
+clock_hz=606000000
+
+backend=systolic_vrl
+B=4
+T=64
+fwd_total_s=1359.752382
+bwd_total_s=2767.181818
+other_s=1.261196
+matmul_s=4125.632251
+attention_s=0.402106
+layernorm_s=0.038867
+gelu_bwd_s=0.396973
+vrl_matmul_s=4125.585165
+hw_cycles_fwd=45704328
+hw_cycles_bwd=94720200
+clock_hz=606000000
+
 
 === Combined timing projection (B=4 T=64) ===
   Sources:

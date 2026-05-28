@@ -24,5 +24,11 @@ Test 12: per-column bias (bias[c]=c+1) → out[m][c]=ROWS+c+1
   PASS
 Test 13: GELU(-1.0) → expected -0.1588
   PASS
+Test 14: M=256 (M_MAX) → C=ROWS=32 for all rows
+  PASS
+Test 15: 4 K-tiles → C=4*ROWS=128
+  PASS
+Test 16: ping-pong preload (W=1 bank0 + preload W=2 bank1) → C=3*ROWS=96
+  PASS
 
-All 32x32 tests PASSED  (13/13)
+All 32x32 tests PASSED  (16/16)

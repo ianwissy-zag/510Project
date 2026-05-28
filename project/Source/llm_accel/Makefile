@@ -462,4 +462,4 @@ clean:
 	$(REMOVE_BUILD_OBJECT_FILES)
 
 clean_verilator:
-	rm -rf $(HDL_VECT)/obj_lib $(HDL_VECT_BF16)/obj_lib
+	rm -rf $(HDL_VECT)/obj_lib $(HDL_VECT_BF16)/obj_lib ../../HDL_Systolic_32x32/obj_lib
