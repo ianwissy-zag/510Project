@@ -12,7 +12,8 @@
 // Test 13:    GELU on negative raw value — W=-1/32, act=1 → raw=-1, GELU(-1)≈-0.159
 // Test 14:    M=256 (M_MAX boundary) — full accumulator depth
 // Test 15:    4 K-tile accumulation — verifies multi-tile accumulation beyond 2 tiles
-// Test 16:    ping-pong preloading — next tile loaded into idle bank during LOAD_WT
+// Test 16:    ping-pong preloading — next tile loaded into idle SRAM bank during LOAD_WT
+// Test 17:    drain-overlap LOAD_WT — next tile shifted into PEs during drain; LOAD_WT skipped
 //
 // NOTE: send_weights sends rows in REVERSE order (ROWS-1→0).  The weight shift
 // chain loads wt_in into PE[0] each cycle and shifts down, so the last beat sent
@@ -30,6 +31,7 @@
 
 static Vsys_top*    dut;
 static VerilatedFstC* tfp;
+static int tb_accum_bank = 0;  // tracks which accumulator bank compute is using
 
 static void tick() {
     dut->clk = 0; dut->eval(); dut->contextp()->timeInc(1); tfp->dump(dut->contextp()->time());
@@ -110,6 +112,10 @@ static bool wait_done(int max_cycles) {
 // Read 2*M_count beats from readback into out[M_count * COLS]
 static void readback(float* out, int M_count, bool apply_bias, bool apply_gelu) {
     const int COLS = 32, VPB = 16;
+    // Toggle accum bank so hardware reads from the bank that was just written.
+    // With accum_buf_sel=X: compute → bank X; readback → ~X bank.
+    tb_accum_bank ^= 1;
+    dut->accum_buf_sel = tb_accum_bank;
     dut->apply_bias    = apply_bias  ? 1 : 0;
     dut->apply_gelu    = apply_gelu  ? 1 : 0;
     dut->m_axis_tready = 1;
@@ -137,6 +143,8 @@ static void run_k_tile(const float* w_tile, const float* acts_flat,
                         int M_count, bool first_k, int wt_bank, int mode) {
     const int ROWS = 32;
     send_weights(w_tile, (uint8_t)wt_bank);
+    dut->accum_buf_sel = tb_accum_bank;
+    dut->preload_rdy   = 0;
     dut->mode         = mode;
     dut->first_k_tile = first_k ? 1 : 0;
     dut->buf_sel      = wt_bank;
@@ -175,6 +183,7 @@ int main() {
 
     dut->rst_n=0; dut->start=0; dut->mode=0;
     dut->first_k_tile=1; dut->buf_sel=0;
+    dut->preload_rdy=0; dut->accum_buf_sel=0;
     dut->M_count=4; dut->rb_start=0; dut->m_axis_tready=0;
     dut->apply_bias=0; dut->apply_gelu=0;
     axi_idle();
@@ -461,9 +470,52 @@ int main() {
         all_pass &= ok; printf("  %s\n", ok?"PASS":"FAIL");
     }
 
-    printf("\nAll 32x32 tests %s  (%d/16)\n",
+    // ── Test 17: drain-overlap LOAD_WT ───────────────────────────────────────
+    // Tile 0: W=1 → bank 0; preload W=2 → bank 1 during LOAD_WT; set preload_rdy=1.
+    // The controller performs drain-overlap LOAD_WT from bank 1 during the drain,
+    // setting wt_preloaded_r=1.  Tile 1 starts with start=1 and the hardware
+    // transitions IDLE→STREAM directly (0-cycle LOAD_WT).  No LOAD_WT tick loop.
+    // Expected output: ROWS*1 + ROWS*2 = 3*ROWS = 96.
+    {
+        float w1[ROWS*COLS]; for (int i=0;i<ROWS*COLS;i++) w1[i]=1.f;
+        float w2[ROWS*COLS]; for (int i=0;i<ROWS*COLS;i++) w2[i]=2.f;
+        float acts[4*ROWS]; for (int i=0;i<4*ROWS;i++) acts[i]=1.f;
+
+        // Tile 0: send W=1 to SRAM bank 0, start LOAD_WT, preload W=2 into bank 1
+        send_weights(w1, 0);
+        dut->accum_buf_sel = tb_accum_bank;
+        dut->mode=0; dut->first_k_tile=1; dut->buf_sel=0; dut->M_count=4;
+        dut->preload_rdy=0;
+        dut->start=1; tick(); dut->start=0;
+        send_weights_nowait(w2, 1);   // preload bank 1 during LOAD_WT (exactly ROWS beats)
+        dut->preload_rdy=1;           // signal controller: drain-overlap is safe
+        for (int m=0; m<4; m++) send_act_beat(acts + m*ROWS, m==3);
+        // Controller triggers drain-overlap LOAD_WT at stream_cnt=M_count+1=5,
+        // shifting bank 1's weights into PEs over 32 cycles; sets wt_preloaded_r.
+        if (!wait_done(4+ROWS+20)) fprintf(stderr, "  WARNING: done not asserted\n");
+        dut->preload_rdy=0;
+        tick();
+
+        // Tile 1: hardware has wt_preloaded_r=1; start fires IDLE→STREAM (no LOAD_WT).
+        dut->first_k_tile=0; dut->buf_sel=1; dut->M_count=4;
+        dut->preload_rdy=0;
+        dut->start=1; tick(); dut->start=0;
+        // No LOAD_WT tick loop — hardware skips directly to STREAM.
+        for (int m=0; m<4; m++) send_act_beat(acts + m*ROWS, m==3);
+        if (!wait_done(4+ROWS+20)) fprintf(stderr, "  WARNING: done not asserted\n");
+        tick();
+
+        readback(out, 4, false, false);
+        printf("Test 17: drain-overlap preload (skip LOAD_WT) → C=3*ROWS=%d\n", 3*ROWS);
+        int ok=1;
+        for (int m=0; m<4; m++) { char l[32]; snprintf(l,32,"C[%d][0]",m);
+            ok &= chk(l, out[m*COLS], (float)(3*ROWS), 1.0f); }
+        all_pass &= ok; printf("  %s\n", ok?"PASS":"FAIL");
+    }
+
+    printf("\nAll 32x32 tests %s  (%d/17)\n",
            all_pass ? "PASSED" : "FAILED",
-           all_pass ? 16 : 0);
+           all_pass ? 17 : 0);
     tfp->close(); delete tfp;
     dut->final(); delete dut;
     return all_pass ? 0 : 1;

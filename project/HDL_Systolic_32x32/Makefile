@@ -3,7 +3,7 @@ VFLAGS      = --cc --exe --build -sv --Wno-fatal --Wno-WIDTH --trace-fst
 VFLAGS_LIB  = --cc        --build -sv --Wno-fatal --Wno-WIDTH
 
 RTL_SRCS = top.sv axi.sv systolic_32x32.sv pe.sv \
-           bf16_mac_unit.sv bf16_mul.sv bf16_fp32_add.sv \
+           bf16_mac_unit.sv bf16_mul.sv fp32_mul.sv bf16_fp32_add.sv \
            weight_sram.sv act_sram.sv output_sram.sv \
            act_stagger.sv accum_sram.sv bias_sram.sv \
            fp32_recip.sv gelu_unit.sv \

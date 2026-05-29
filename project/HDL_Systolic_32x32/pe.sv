@@ -48,9 +48,10 @@ module pe (
             weight_reg <= '0;
             a_out      <= '0;
             psum_out   <= '0;
-        end else if (load_wt) begin
-            weight_reg <= w_in;
         end else begin
+            // Weight load and psum propagation are independent; a_in=0 during
+            // drain ensures mac_result=psum_in regardless of which weight is loaded.
+            if (load_wt) weight_reg <= w_in;
             a_out    <= a_in;
             psum_out <= mac_result;
         end

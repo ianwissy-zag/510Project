@@ -45,6 +45,8 @@ module sys_top #(
     input  logic                first_k_tile,
     input  logic                buf_sel,
     input  logic [M_ADDR_W-1:0] M_count,
+    input  logic                preload_rdy,   // 1 → next weights in ~buf_sel SRAM; enable drain-overlap LOAD_WT
+    input  logic                accum_buf_sel, // 0/1 → selects which accumulator bank compute writes to
     output logic                done,
 
     // Readback post-processing
@@ -79,6 +81,8 @@ module sys_top #(
     logic                       accum_we;
     logic [M_ADDR_W-1:0]        accum_rd_addr, accum_wr_addr;
     logic [COLS*PSUM_WIDTH-1:0] accum_wdata, accum_rdata_a, accum_rdata_b;
+    logic [COLS*PSUM_WIDTH-1:0] accum_rdata_a0, accum_rdata_a1;
+    logic [COLS*PSUM_WIDTH-1:0] accum_rdata_b0, accum_rdata_b1;
     logic [M_ADDR_W-1:0]        rb_sram_addr;
 
     logic                           bias_we, bias_beat_sel;
@@ -145,7 +149,7 @@ module sys_top #(
     u_ctrl (
         .clk(clk), .rst_n(rst_n),
         .start(start), .mode(mode), .first_k_tile(first_k_tile),
-        .buf_sel(buf_sel),
+        .buf_sel(buf_sel), .preload_rdy(preload_rdy),
         .M_count(M_count), .done(done),
         .wt_addr_0(wt_addr_0), .wt_addr_1(wt_addr_1),
         .wt_re_0(wt_re_0), .wt_re_1(wt_re_1),
@@ -157,14 +161,29 @@ module sys_top #(
         .accum_rd_addr(accum_rd_addr), .accum_wr_addr(accum_wr_addr),
         .accum_wdata(accum_wdata), .accum_rdata(accum_rdata_a));
 
-    // ── Accumulator SRAM ─────────────────────────────────────────────────────
+    // ── Accumulator SRAM — double-buffered ping/pong ──────────────────────────
+    // accum_buf_sel selects the compute bank (written by controller).
+    // Readback reads from the opposite bank (~accum_buf_sel) so that
+    // writeback of N-tile i can overlap with computation of N-tile i+1.
     accum_sram #(.COLS(COLS),.PSUM_WIDTH(PSUM_WIDTH),
                  .M_MAX(M_MAX),.ADDR_WIDTH(M_ADDR_W))
-    u_accum (
-        .clk(clk), .we(accum_we),
+    u_accum_0 (
+        .clk(clk), .we(accum_we && !accum_buf_sel),
         .wr_addr(accum_wr_addr), .wdata(accum_wdata),
-        .rd_addr_a(accum_rd_addr), .rdata_a(accum_rdata_a),
-        .rd_addr_b(rb_sram_addr),  .rdata_b(accum_rdata_b));
+        .rd_addr_a(accum_rd_addr), .rdata_a(accum_rdata_a0),
+        .rd_addr_b(rb_sram_addr),  .rdata_b(accum_rdata_b0));
+
+    accum_sram #(.COLS(COLS),.PSUM_WIDTH(PSUM_WIDTH),
+                 .M_MAX(M_MAX),.ADDR_WIDTH(M_ADDR_W))
+    u_accum_1 (
+        .clk(clk), .we(accum_we &&  accum_buf_sel),
+        .wr_addr(accum_wr_addr), .wdata(accum_wdata),
+        .rd_addr_a(accum_rd_addr), .rdata_a(accum_rdata_a1),
+        .rd_addr_b(rb_sram_addr),  .rdata_b(accum_rdata_b1));
+
+    // Compute reads from the selected bank; readback reads from the other bank.
+    assign accum_rdata_a = accum_buf_sel ? accum_rdata_a1 : accum_rdata_a0;
+    assign accum_rdata_b = accum_buf_sel ? accum_rdata_b0 : accum_rdata_b1;
 
     // ── Readback with bias + GELU ─────────────────────────────────────────────
     axi_readback #(.COLS(COLS),.PSUM_WIDTH(PSUM_WIDTH),

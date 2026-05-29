@@ -3,8 +3,9 @@
 // Controller for the 32×32 BF16 systolic accelerator — streaming M-row mode.
 //
 // State machine: IDLE → LOAD_WT → STREAM → DONE
+//   (IDLE → STREAM directly when wt_preloaded_r is set from a prior drain-overlap)
 //
-//   LOAD_WT (ROWS=16 cycles): reads weight SRAM row by row, shifts into PEs.
+//   LOAD_WT (ROWS cycles): reads weight SRAM row by row, shifts into PEs.
 //
 //   STREAM (M_count + ROWS cycles):
 //     Each cycle the act_stagger module receives one new activation slice
@@ -42,6 +43,7 @@ module controller #(
     input  logic                  first_k_tile, // 1→seed psum from zero
     input  logic                  buf_sel,      // selects ping (0) or pong (1) weight bank
     input  logic [M_ADDR_W-1:0]   M_count,      // number of M rows to stream
+    input  logic                  preload_rdy,  // 1→ next tile weights in ~buf_sel SRAM; start drain-overlap LOAD_WT
     output logic                  done,
 
     // Weight SRAM read (shared ping/pong for forward and backward)
@@ -69,12 +71,17 @@ module controller #(
     typedef enum logic [1:0] { IDLE, LOAD_WT, STREAM, DONE_ST } state_t;
     state_t state;
 
-    logic [ADDR_WIDTH-1:0] wt_cnt;     // LOAD_WT row counter
-    logic [8:0]            stream_cnt; // STREAM cycle counter (needs 9 bits: max 256+16=272)
+    logic [ADDR_WIDTH-1:0] wt_cnt;       // LOAD_WT row counter
+    logic [8:0]            stream_cnt;  // STREAM cycle counter (needs 9 bits: max 256+32+1=289)
+    logic [ADDR_WIDTH-1:0] ovlp_cnt;    // drain-overlap LOAD_WT row counter
+    logic                  ovlp_active; // drain-overlap LOAD_WT in progress
+    logic                  wt_preloaded_r; // next tile weights already shifted into PEs via drain-overlap
 
     // ── Weight SRAM mux ───────────────────────────────────────────────────────
+    // During normal LOAD_WT read from buf_sel bank; during drain-overlap read
+    // from the opposite bank (which holds the next tile's preloaded weights).
     logic [COLS*WT_WIDTH-1:0] wt_rdata_mux;
-    assign wt_rdata_mux = buf_sel ? wt_rdata_1 : wt_rdata_0;
+    assign wt_rdata_mux = (buf_sel ^ ovlp_active) ? wt_rdata_1 : wt_rdata_0;
 
     genvar c;
     generate
@@ -83,16 +90,18 @@ module controller #(
     endgenerate
 
     // ── Weight SRAM addresses / read enables ─────────────────────────────────
-    assign wt_addr_0 = wt_cnt;
-    assign wt_addr_1 = wt_cnt;
+    // During drain-overlap LOAD_WT use ovlp_cnt; otherwise use wt_cnt.
+    assign wt_addr_0 = ovlp_active ? ovlp_cnt : wt_cnt;
+    assign wt_addr_1 = ovlp_active ? ovlp_cnt : wt_cnt;
 
     logic in_load;
     assign in_load = (state == LOAD_WT);
 
-    assign wt_re_0 = in_load && !buf_sel;
-    assign wt_re_1 = in_load &&  buf_sel;
+    // Normal LOAD_WT reads from buf_sel bank; drain-overlap reads from ~buf_sel.
+    assign wt_re_0 = (in_load && !buf_sel) || (ovlp_active &&  buf_sel);
+    assign wt_re_1 = (in_load &&  buf_sel) || (ovlp_active && !buf_sel);
 
-    assign load_wt    = in_load;
+    assign load_wt    = in_load || ovlp_active;
     assign stagger_en = (state == STREAM);
 
     // ── STREAM timing ─────────────────────────────────────────────────────────
@@ -145,15 +154,26 @@ module controller #(
     // ── State machine ─────────────────────────────────────────────────────────
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            state      <= IDLE;
-            wt_cnt     <= '0;
-            stream_cnt <= '0;
+            state          <= IDLE;
+            wt_cnt         <= '0;
+            stream_cnt     <= '0;
+            ovlp_cnt       <= '0;
+            ovlp_active    <= 1'b0;
+            wt_preloaded_r <= 1'b0;
         end else begin
             case (state)
                 IDLE: begin
                     if (start) begin
-                        state  <= LOAD_WT;
-                        wt_cnt <= '0;
+                        if (wt_preloaded_r) begin
+                            // Weights already shifted into PEs via drain-overlap;
+                            // skip LOAD_WT and go directly to STREAM.
+                            state          <= STREAM;
+                            stream_cnt     <= '0;
+                            wt_preloaded_r <= 1'b0;
+                        end else begin
+                            state  <= LOAD_WT;
+                            wt_cnt <= '0;
+                        end
                     end
                 end
 
@@ -171,6 +191,24 @@ module controller #(
                         state <= DONE_ST;
                     else
                         stream_cnt <= stream_cnt + 1'b1;
+
+                    // Drain-overlap LOAD_WT: begin loading next tile weights into
+                    // PEs from the ~buf_sel SRAM bank at the start of the drain
+                    // phase (stream_cnt == M_count+1).  Safety: PE[r]'s last
+                    // non-zero activation arrives at stream_cnt = M_count+r;
+                    // the new weight reaches PE[r] at M_count+1+r > M_count+r. ✓
+                    if (!ovlp_active && preload_rdy &&
+                            stream_cnt == 9'(M_count) + 9'(1)) begin
+                        ovlp_active <= 1'b1;
+                        ovlp_cnt    <= '0;
+                    end
+                    if (ovlp_active) begin
+                        if (ovlp_cnt == ADDR_WIDTH'(ROWS - 1)) begin
+                            ovlp_active    <= 1'b0;
+                            wt_preloaded_r <= 1'b1;
+                        end else
+                            ovlp_cnt <= ovlp_cnt + 1'b1;
+                    end
                 end
 
                 DONE_ST: state <= IDLE;

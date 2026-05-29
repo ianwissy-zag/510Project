@@ -2,8 +2,8 @@
 
 // AXI4-Stream readback with pipelined bias addition and GELU.
 //
-// The gelu_unit has an 8-stage pipeline plus one input pre-register =
-// GELU_LATENCY=9 cycles end-to-end.  A warmup counter runs for GELU_LATENCY
+// The gelu_unit has a 20-stage pipeline plus one input pre-register =
+// GELU_LATENCY=21 cycles end-to-end.  A warmup counter runs for GELU_LATENCY
 // cycles before the AXI output begins, feeding the SRAM address sequence from
 // 0 so that by the time the first beat is transmitted the pipeline output is
 // correctly aligned with M row 0.
@@ -12,11 +12,11 @@
 //   total_cnt 0,1  → addr=0  (warm-up, pipeline filling, tvalid=0)
 //   total_cnt 2,3  → addr=1  (warm-up)
 //   ...
-//   total_cnt 8    → addr=4  (warm-up, last cycle — GELU_LATENCY=9)
-//   total_cnt 9,10 → addr=0  (output beat 0,1  — gelu output = M row 0) ✓
-//   total_cnt 11,12→ addr=1  (output beat 2,3  — gelu output = M row 1) ✓
+//   total_cnt 20   → addr=10 (warm-up, last cycle — GELU_LATENCY=21)
+//   total_cnt 21,22→ addr=0  (output beat 0,1  — gelu output = M row 0) ✓
+//   total_cnt 23,24→ addr=1  (output beat 2,3  — gelu output = M row 1) ✓
 //   ...
-//   total_cnt 9+2*(M-1), 9+2*(M-1)+1 → addr=M-1 (gelu output = M row M-1) ✓
+//   total_cnt 21+2*(M-1), 21+2*(M-1)+1 → addr=M-1 (gelu output = M row M-1) ✓
 //
 // Because the SRAM is combinational and all data was written before readback
 // starts, re-reading an address that was already presented during warm-up is
@@ -31,7 +31,7 @@ module axi_readback #(
     parameter AXI_WIDTH   = 512,
     parameter M_MAX       = 256,
     parameter M_ADDR_W    = $clog2(M_MAX + 1),
-    parameter GELU_LATENCY = 9    // 8 gelu_unit banks + 1 input pre-register
+    parameter GELU_LATENCY = 21   // 20 gelu_unit stages + 1 input pre-register
 )(
     input  logic clk,
     input  logic rst_n,

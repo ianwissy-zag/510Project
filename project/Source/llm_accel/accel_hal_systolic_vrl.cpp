@@ -30,7 +30,8 @@ static long long         g_hw_cycles_fwd = 0;
 static long long         g_hw_cycles_bwd = 0;
 static long long         g_tick_count    = 0;  // total simulated clock cycles
 static int               g_wt_bank        = 0;  // alternates ping/pong each K-tile
-static bool              g_wt_preloaded   = false; // current tile already in SRAM
+static bool              g_wt_preloaded   = false; // current tile already in PEs via drain-overlap
+static int               g_accum_bank     = 0;  // accumulator ping/pong: toggles at each readback
 
 // ── Clock / AXI helpers ───────────────────────────────────────────────────────
 static void tick(void) {
@@ -87,6 +88,8 @@ extern "C" void accel_hal_init(void) {
     g_dut->mode          = 0;
     g_dut->first_k_tile  = 1;
     g_dut->buf_sel       = 0;
+    g_dut->preload_rdy   = 0;
+    g_dut->accum_buf_sel = 0;
     g_dut->M_count       = 1;
     g_dut->rb_start      = 0;
     g_dut->m_axis_tready = 0;
@@ -108,28 +111,36 @@ extern "C" void hal_stream_tile(const bf16_t* w_tile, const bf16_t* next_w_tile,
     int bank = g_wt_bank;
     uint8_t wt_tuser = (uint8_t)bank;
 
-    // Load current tile's weights only if not already preloaded during previous LOAD_WT.
+    // Set accumulator bank for this tile (constant across all K-tiles of one N-tile).
+    g_dut->accum_buf_sel = (uint8_t)g_accum_bank;
+
+    // Load current tile's weights into SRAM only if not already shifted into PEs
+    // via a prior drain-overlap LOAD_WT.
     if (!g_wt_preloaded)
         send_weight_tile(w_tile, wt_tuser);
-    g_wt_preloaded = false;
 
-    // Trigger LOAD_WT → STREAM
-    g_dut->mode        = mode;
+    // Trigger LOAD_WT → STREAM (or IDLE → STREAM directly if wt_preloaded_r is set).
+    g_dut->mode         = mode;
     g_dut->first_k_tile = first_k ? 1 : 0;
     g_dut->buf_sel      = bank;
-    g_dut->M_count      = (uint16_t)M_count;  // 9-bit port, needs uint16_t not uint8_t
+    g_dut->M_count      = (uint16_t)M_count;
+    g_dut->preload_rdy  = 0;
     g_dut->start = 1; tick(); g_dut->start = 0;
 
-    // During LOAD_WT (ROWS cycles): preload next tile into the idle ping-pong bank.
-    // send_weight_tile issues exactly ROWS beats, matching LOAD_WT duration perfectly.
-    if (next_w_tile) {
-        int next_bank = bank ^ 1;
-        uint8_t next_tuser = (uint8_t)next_bank;
-        send_weight_tile(next_w_tile, next_tuser);
-        g_wt_preloaded = true;
-    } else {
-        for (int i = 0; i < ACCEL_SYS_ROWS; i++) tick();
+    if (!g_wt_preloaded) {
+        // During LOAD_WT (ROWS cycles): preload next tile's weights into the idle
+        // SRAM bank, then signal the controller to perform drain-overlap LOAD_WT.
+        if (next_w_tile) {
+            int next_bank = bank ^ 1;
+            send_weight_tile(next_w_tile, (uint8_t)next_bank);
+            g_dut->preload_rdy = 1;  // next tile is in SRAM; controller will drain-overlap
+        } else {
+            for (int i = 0; i < ACCEL_SYS_ROWS; i++) tick();
+        }
     }
+    // If wt_preloaded (LOAD_WT skipped by hardware): preload_rdy was already set;
+    // weights for the next tile were written to SRAM during the previous drain window.
+    g_wt_preloaded = false;
 
     // Stream M_count activation beats — one per cycle, tuser=100
     for (int m = 0; m < M_count; m++) {
@@ -138,11 +149,16 @@ extern "C" void hal_stream_tile(const bf16_t* w_tile, const bf16_t* next_w_tile,
                   ACCEL_SYS_ROWS);
     }
 
-    // Wait for STREAM to drain: M_count injection + ROWS fill + 2 pipeline flush
+    // Wait for drain to complete.  The controller triggers drain-overlap LOAD_WT
+    // at stream_cnt=M_count+1 (if preload_rdy=1), finishing one cycle before DONE.
     if (!wait_done(M_count + ACCEL_SYS_ROWS + 10))
         fprintf(stderr, "[systolic/vrl] WARNING: done not asserted (stream)\n");
+    g_dut->preload_rdy = 0;
     tick();
 
+    // If drain-overlap ran, next tile's weights are now in PEs (wt_preloaded_r set
+    // in hardware); record this so the next call skips the SRAM→PE LOAD_WT phase.
+    g_wt_preloaded = (next_w_tile != nullptr);
     g_wt_bank ^= 1;  // alternate ping/pong for next K-tile
     if (mode == 0) g_fwd_tiles++;
     else           g_bwd_tiles++;
@@ -175,6 +191,11 @@ extern "C" void hal_load_bias(const float* bias, int N) {
 static void readback_all(float* out, int M_count, int ab, int ag) {
     const int VPB  = 16;
     const int COLS = ACCEL_SYS_COLS;
+
+    // Toggle accum_buf_sel so readback reads from the bank that was just written.
+    // After toggle: hardware reads from ~accum_buf_sel = the previously-written bank.
+    g_accum_bank ^= 1;
+    g_dut->accum_buf_sel = (uint8_t)g_accum_bank;
 
     g_dut->apply_bias    = ab;
     g_dut->apply_gelu    = ag;
@@ -237,6 +258,7 @@ extern "C" void hal_compute_tile_bwd(const bf16_t*, const bf16_t*, int) {
 // ── Timing ────────────────────────────────────────────────────────────────────
 extern "C" void accel_reset_timing(void) {
     g_fwd_tiles = 0; g_bwd_tiles = 0; g_wt_bank = 0; g_wt_preloaded = false;
+    g_accum_bank = 0; g_dut->accum_buf_sel = 0;
     g_hw_cycles_fwd = 0; g_hw_cycles_bwd = 0; g_tick_count = 0;
 }
 
