@@ -31,11 +31,34 @@ static long long         g_hw_cycles_bwd = 0;
 static long long         g_tick_count    = 0;  // total simulated clock cycles
 static int               g_wt_bank        = 0;  // alternates ping/pong each K-tile
 static bool              g_wt_preloaded   = false; // current tile already in PEs via drain-overlap
-static int               g_accum_bank     = 0;  // accumulator ping/pong: toggles at each readback
+static int               g_accum_bank          = 0;
+static bool              g_accum_toggled       = false; // prevents double-toggle within an N-tile
+static bool              g_accum_gelu_pending  = false; // biased+gelu pair in flight — block K-tile reset
+
+// ── Async readback state ──────────────────────────────────────────────────────
+// Non-null while a readback is in flight; beats are harvested inside tick() so
+// any code that calls tick() (streaming, wait_done) implicitly drains the pipe.
+static float* g_rb_buf   = nullptr;
+static int    g_rb_need  = 0;   // 2 × M_count beats expected
+static int    g_rb_beats = 0;   // beats collected so far
+static int    g_rb_ab    = 0;   // saved apply_bias  (for warning)
+static int    g_rb_ag    = 0;   // saved apply_gelu  (for warning)
 
 // ── Clock / AXI helpers ───────────────────────────────────────────────────────
 static void tick(void) {
     g_dut->clk = 0; g_dut->eval();
+    // Harvest a beat PRE-posedge: this eval reflects the state left by the
+    // previous posedge (running still 1, correct tdata).  Checking after the
+    // posedge would miss the final beat because running goes 0 at that edge.
+    if (g_rb_buf && g_rb_beats < g_rb_need
+            && g_dut->m_axis_tvalid && g_dut->m_axis_tready) {
+        int m = g_rb_beats / 2, half = g_rb_beats % 2;
+        for (int i = 0; i < 16; i++) {
+            uint32_t bits = g_dut->m_axis_tdata[i];
+            memcpy(&g_rb_buf[m * ACCEL_SYS_COLS + half * 16 + i], &bits, sizeof(float));
+        }
+        g_rb_beats++;
+    }
     g_dut->clk = 1; g_dut->eval();
     g_dut->clk = 0; g_dut->eval();
     g_tick_count++;
@@ -107,11 +130,16 @@ extern "C" void accel_hal_free(void) {
 // Loads weights then streams M_count activation rows.
 // mode: 0=forward (tuser=0/1), 1=backward (tuser=2/3)
 extern "C" void hal_stream_tile(const bf16_t* w_tile, const bf16_t* next_w_tile,
+                                 const bf16_t* next_next_w_tile,
                                  const bf16_t* acts, int M_count, int first_k, int mode) {
     int bank = g_wt_bank;
-    uint8_t wt_tuser = (uint8_t)bank;
+    uint8_t wt_tuser = (uint8_t)bank;  // current bank = buf_sel for this tile
 
-    // Set accumulator bank for this tile (constant across all K-tiles of one N-tile).
+    // Set accumulator bank for this tile.  The toggle guard must NOT be reset while
+    // a biased+gelu readback pair is in flight (g_accum_gelu_pending=true) because
+    // the gelu half of the pair runs after these K-tiles and needs the same bank.
+    if (!g_accum_gelu_pending)
+        g_accum_toggled = false;
     g_dut->accum_buf_sel = (uint8_t)g_accum_bank;
 
     // Load current tile's weights into SRAM only if not already shifted into PEs
@@ -128,19 +156,21 @@ extern "C" void hal_stream_tile(const bf16_t* w_tile, const bf16_t* next_w_tile,
     g_dut->start = 1; tick(); g_dut->start = 0;
 
     if (!g_wt_preloaded) {
-        // During LOAD_WT (ROWS cycles): preload next tile's weights into the idle
-        // SRAM bank, then signal the controller to perform drain-overlap LOAD_WT.
+        // During LOAD_WT (ROWS cycles): write K(n+1) into idle SRAM bank (bank^1),
+        // then assert preload_rdy so the controller performs drain-overlap LOAD_WT.
         if (next_w_tile) {
-            int next_bank = bank ^ 1;
-            send_weight_tile(next_w_tile, (uint8_t)next_bank);
-            g_dut->preload_rdy = 1;  // next tile is in SRAM; controller will drain-overlap
+            send_weight_tile(next_w_tile, (uint8_t)(bank ^ 1));
+            g_dut->preload_rdy = 1;
         } else {
             for (int i = 0; i < ACCEL_SYS_ROWS; i++) tick();
         }
+    } else {
+        // K(n) already in PEs; K(n+1) already in SRAM bank ~buf_sel from the
+        // previous tile's concurrent drain write.  Assert preload_rdy so the
+        // controller performs drain-overlap LOAD_WT for K(n+1) during this drain.
+        if (next_w_tile)
+            g_dut->preload_rdy = 1;
     }
-    // If wt_preloaded (LOAD_WT skipped by hardware): preload_rdy was already set;
-    // weights for the next tile were written to SRAM during the previous drain window.
-    g_wt_preloaded = false;
 
     // Stream M_count activation beats — one per cycle, tuser=100
     for (int m = 0; m < M_count; m++) {
@@ -149,15 +179,20 @@ extern "C" void hal_stream_tile(const bf16_t* w_tile, const bf16_t* next_w_tile,
                   ACCEL_SYS_ROWS);
     }
 
-    // Wait for drain to complete.  The controller triggers drain-overlap LOAD_WT
-    // at stream_cnt=M_count+1 (if preload_rdy=1), finishing one cycle before DONE.
+    // Concurrent drain write: drain-overlap reads K(n+1) from bank ~buf_sel into PEs;
+    // AXI simultaneously writes K(n+2) into bank buf_sel (wt_tuser=bank).
+    // These are independent SRAM banks — no conflict.  ROWS beats fit in the
+    // ROWS-cycle drain window so K(n+2) is ready before the next tile needs it.
+    if (next_next_w_tile)
+        send_weight_tile(next_next_w_tile, wt_tuser);
+
     if (!wait_done(M_count + ACCEL_SYS_ROWS + 10))
         fprintf(stderr, "[systolic/vrl] WARNING: done not asserted (stream)\n");
     g_dut->preload_rdy = 0;
     tick();
 
-    // If drain-overlap ran, next tile's weights are now in PEs (wt_preloaded_r set
-    // in hardware); record this so the next call skips the SRAM→PE LOAD_WT phase.
+    // Both preloaded and non-preloaded paths assert preload_rdy when next_w_tile
+    // is provided, so drain-overlap fires every K-tile → flag is simply non-null.
     g_wt_preloaded = (next_w_tile != nullptr);
     g_wt_bank ^= 1;  // alternate ping/pong for next K-tile
     if (mode == 0) g_fwd_tiles++;
@@ -184,45 +219,49 @@ extern "C" void hal_load_bias(const float* bias, int N) {
     }
 }
 
-// ── Readback (internal helper) ────────────────────────────────────────────────
-// Triggers one readback with the requested apply_bias / apply_gelu flags.
-// accum_sram is read-only during readback so multiple calls from the same
-// accumulated result are safe.
-static void readback_all(float* out, int M_count, int ab, int ag) {
-    const int VPB  = 16;
-    const int COLS = ACCEL_SYS_COLS;
+// ── Readback helpers ──────────────────────────────────────────────────────────
+// readback_start_internal: toggles accum bank (guarded), arms the hardware
+//   readback unit, and sets g_rb_buf so tick() harvests beats automatically.
+// readback_sync_internal:  drains any remaining beats and tears down state.
+// Both halves are non-blocking relative to each other; between them the caller
+// may stream K-tiles and beats will be collected inside every tick().
 
-    // Toggle accum_buf_sel so readback reads from the bank that was just written.
-    // After toggle: hardware reads from ~accum_buf_sel = the previously-written bank.
-    g_accum_bank ^= 1;
-    g_dut->accum_buf_sel = (uint8_t)g_accum_bank;
-
+static void readback_start_internal(float* out, int M_count, int ab, int ag) {
+    if (!g_accum_toggled) {
+        g_accum_bank ^= 1;
+        g_dut->accum_buf_sel = (uint8_t)g_accum_bank;
+        g_accum_toggled = true;
+    }
+    g_rb_buf   = out;
+    g_rb_need  = 2 * M_count;
+    g_rb_beats = 0;
+    g_rb_ab    = ab;
+    g_rb_ag    = ag;
     g_dut->apply_bias    = ab;
     g_dut->apply_gelu    = ag;
     g_dut->m_axis_tready = 1;
     g_dut->rb_start = 1; tick(); g_dut->rb_start = 0;
+}
 
-    int beats = 0, need = 2 * M_count;
-    for (int t = 0; t < need * 8 + 40 && beats < need; t++) {
-        g_dut->eval();
-        if (g_dut->m_axis_tvalid && g_dut->m_axis_tready) {
-            int m = beats / 2, half = beats % 2;
-            for (int i = 0; i < VPB; i++) {
-                int col = half * VPB + i;
-                uint32_t bits = g_dut->m_axis_tdata[i];
-                memcpy(&out[m * COLS + col], &bits, sizeof(float));
-            }
-            beats++;
-        }
+static void readback_sync_internal(void) {
+    if (!g_rb_buf) return;
+    int max_t = (g_rb_need - g_rb_beats) * 8 + 40;
+    for (int t = 0; t < max_t && g_rb_beats < g_rb_need; t++)
         tick();
-    }
-    if (beats < need)
+    if (g_rb_beats < g_rb_need)
         fprintf(stderr, "[systolic/vrl] WARNING: only %d/%d readback beats "
-                "(apply_bias=%d apply_gelu=%d)\n", beats, need, ab, ag);
-
+                "(apply_bias=%d apply_gelu=%d)\n",
+                g_rb_beats, g_rb_need, g_rb_ab, g_rb_ag);
     g_dut->apply_bias    = 0;
     g_dut->apply_gelu    = 0;
-    g_dut->m_axis_tready = 0; tick();
+    g_dut->m_axis_tready = 0;
+    g_rb_buf = nullptr;
+    tick();
+}
+
+static void readback_all(float* out, int M_count, int ab, int ag) {
+    readback_start_internal(out, M_count, ab, ag);
+    readback_sync_internal();
 }
 
 // ── Readback public variants ──────────────────────────────────────────────────
@@ -244,6 +283,34 @@ extern "C" void hal_read_results_all_biased_gelu(float* out, int M_count) {
     readback_all(out, M_count, 1, 1);
 }
 
+// ── Async readback public API ─────────────────────────────────────────────────
+// hal_readback_start / hal_readback_start_biased: arm hardware readback and
+//   return immediately; beats are collected inside every subsequent tick().
+// hal_readback_sync: drain remaining beats and release the readback unit.
+// Only one readback may be in flight at a time.
+extern "C" void hal_readback_start(float* out, int M_count) {
+    readback_start_internal(out, M_count, 0, 0);
+}
+extern "C" void hal_readback_start_biased(float* out, int M_count) {
+    readback_start_internal(out, M_count, 1, 0);
+}
+extern "C" void hal_readback_sync(void) {
+    readback_sync_internal();
+}
+
+// hal_readback_start_biased_for_gelu: like hal_readback_start_biased but marks
+//   a biased+gelu pair in flight so K-tile calls don't reset the toggle guard.
+// hal_readback_done: call after BOTH readbacks of the pair complete to release
+//   the guard and allow the next N-tile's readback to toggle the bank.
+extern "C" void hal_readback_start_biased_for_gelu(float* out, int M_count) {
+    readback_start_internal(out, M_count, 1, 0);
+    g_accum_gelu_pending = true;
+}
+extern "C" void hal_readback_done(void) {
+    g_accum_gelu_pending = false;
+    g_accum_toggled      = false;
+}
+
 // ── Legacy single-tile interface (unused for systolic_vrl, kept for linking) ──
 extern "C" void hal_compute_tile(const bf16_t*, const bf16_t*, int) {
     fprintf(stderr, "[systolic/vrl] hal_compute_tile: use hal_stream_tile\n");
@@ -258,8 +325,9 @@ extern "C" void hal_compute_tile_bwd(const bf16_t*, const bf16_t*, int) {
 // ── Timing ────────────────────────────────────────────────────────────────────
 extern "C" void accel_reset_timing(void) {
     g_fwd_tiles = 0; g_bwd_tiles = 0; g_wt_bank = 0; g_wt_preloaded = false;
-    g_accum_bank = 0; g_dut->accum_buf_sel = 0;
+    g_accum_bank = 0; g_accum_toggled = false; g_accum_gelu_pending = false; g_dut->accum_buf_sel = 0;
     g_hw_cycles_fwd = 0; g_hw_cycles_bwd = 0; g_tick_count = 0;
+    g_rb_buf = nullptr; g_rb_need = 0; g_rb_beats = 0;
 }
 
 extern "C" long long hal_sim_cycle_snapshot(void) { return g_tick_count; }

@@ -58,6 +58,7 @@ void hal_read_results(float* out);
 // acts        : M_count × SYS_ROWS BF16, one row of K-elements per M row
 // first_k     : 1 = reset accumulator (first K-tile), 0 = accumulate
 void hal_stream_tile(const bf16_t* w_tile, const bf16_t* next_w_tile,
+                     const bf16_t* next_next_w_tile,
                      const bf16_t* acts, int M_count, int first_k, int mode);
 
 // Load N FP32 bias values into the hardware bias SRAM (N must equal SYS_COLS).
@@ -70,6 +71,17 @@ void hal_read_results_all(float* out, int M_count);             // raw
 void hal_read_results_all_gelu(float* out, int M_count);        // GELU(raw)
 void hal_read_results_all_biased(float* out, int M_count);      // raw+bias = fch
 void hal_read_results_all_biased_gelu(float* out, int M_count); // GELU(raw+bias) = fch_gelu
+
+// Async readback: arm the readback unit and return immediately.  Beats are
+// harvested inside every tick() so any subsequent hal_stream_tile calls overlap
+// with the readback automatically.  Call hal_readback_sync() to drain remaining
+// beats before reading the output buffer or starting the next readback.
+void hal_readback_start(float* out, int M_count);                  // raw
+void hal_readback_start_biased(float* out, int M_count);           // raw + bias
+void hal_readback_start_biased_for_gelu(float* out, int M_count);  // raw+bias, gelu readback follows
+void hal_readback_sync(void);                                      // finish pending readback
+// Call after both reads of a biased+gelu pair complete — releases the bank guard.
+void hal_readback_done(void);
 
 // ── Backward dinp tile (systolic backends only) ───────────────────────────────
 // wT_tile : SYS_ROWS × SYS_COLS BF16 values of the TRANSPOSED weight matrix

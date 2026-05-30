@@ -218,6 +218,7 @@ void layernorm_backward(float* dinp, float* dweight, float* dbias,
 // Static buffers avoid stack pressure for large M.
 static bf16_t s_w_tile[ACCEL_SYS_ROWS * ACCEL_SYS_COLS];
 static bf16_t s_w_tile_next[ACCEL_SYS_ROWS * ACCEL_SYS_COLS];
+static bf16_t s_w_tile_next_next[ACCEL_SYS_ROWS * ACCEL_SYS_COLS];
 static bf16_t s_acts_all[256 * ACCEL_SYS_ROWS];   // M_max=256 rows × K_DEPTH
 static float  s_result_all[256 * ACCEL_SYS_COLS];  // M_max=256 rows × N_TILE
 
@@ -229,6 +230,11 @@ static void accel_matmul(float* out, const float* inp, const float* weight,
     int K_rem   = K % TILE_K;
     double _t_vrl = now_s();
     long long _cyc0 = hal_sim_cycle_snapshot();
+
+    // rb_pending_nbase: n_base of the N-tile whose async readback is in flight.
+    // Beats are harvested inside tick() during subsequent K-tile streaming,
+    // overlapping readback of N-tile n with compute of N-tile n+1.
+    int rb_pending_nbase = -1;
 
     for (int nt = 0; nt < N_tiles; nt++) {
         int n_base = nt * TILE_N;
@@ -254,20 +260,38 @@ static void accel_matmul(float* out, const float* inp, const float* weight,
                 next_w = s_w_tile_next;
             }
 
+            // Pack K(kt+2) weights for concurrent drain write
+            const bf16_t* next_next_w = NULL;
+            if (kt + 2 < K_tiles) {
+                int k_next2 = (kt + 2) * TILE_K;
+                for (int k = 0; k < TILE_K; k++)
+                    for (int n = 0; n < TILE_N; n++)
+                        s_w_tile_next_next[k * TILE_N + n] =
+                            float_to_bf16(weight[(n_base + n) * K + k_next2 + k]);
+                next_next_w = s_w_tile_next_next;
+            }
+
             // Pack all M rows' activation slice for this K-tile
             for (int m = 0; m < M; m++)
                 for (int k = 0; k < TILE_K; k++)
                     s_acts_all[m * TILE_K + k] =
                         float_to_bf16(inp[m * K + k_base + k]);
 
-            hal_stream_tile(s_w_tile, next_w, s_acts_all, M, first_k, 0);
+            hal_stream_tile(s_w_tile, next_w, next_next_w, s_acts_all, M, first_k, 0);
         }
 
         if (K_tiles > 0) {
-            hal_read_results_all(s_result_all, M);
-            for (int m = 0; m < M; m++)
-                for (int n = 0; n < TILE_N; n++)
-                    out[m * N + n_base + n] = s_result_all[m * TILE_N + n];
+            // Drain the previous N-tile's async readback (maximally overlapped with
+            // the K-tile loop above), copy its results, then start this N-tile's
+            // readback asynchronously so it overlaps with N-tile nt+1's K-tiles.
+            if (rb_pending_nbase >= 0) {
+                hal_readback_sync();
+                for (int m = 0; m < M; m++)
+                    for (int n = 0; n < TILE_N; n++)
+                        out[m * N + rb_pending_nbase + n] = s_result_all[m * TILE_N + n];
+            }
+            hal_readback_start(s_result_all, M);
+            rb_pending_nbase = n_base;
         }
 
         // K remainder on CPU
@@ -281,6 +305,14 @@ static void accel_matmul(float* out, const float* inp, const float* weight,
                             a * weight[(n_base + n) * K + k_base + k];
                 }
         }
+    }
+
+    // Drain the final N-tile's async readback.
+    if (rb_pending_nbase >= 0) {
+        hal_readback_sync();
+        for (int m = 0; m < M; m++)
+            for (int n = 0; n < TILE_N; n++)
+                out[m * N + rb_pending_nbase + n] = s_result_all[m * TILE_N + n];
     }
 
     // N remainder on CPU
@@ -313,6 +345,12 @@ static void accel_matmul_gelu(float* out_raw, float* out_gelu,
     double _t_vrl = now_s();
     long long _cyc0 = hal_sim_cycle_snapshot();
 
+    // rb_gelu_pending_nbase: n_base of the N-tile whose biased readback is in
+    // flight.  Beats are harvested in tick() during the next N-tile's K-loops.
+    // After K-tiles finish we sync the biased readback, copy raw, then do the
+    // GELU readback blocking (same bank, same bias — no reload needed).
+    int rb_gelu_pending_nbase = -1;
+
     for (int nt = 0; nt < N_tiles; nt++) {
         int n_base = nt * TILE_N;
 
@@ -332,28 +370,45 @@ static void accel_matmul_gelu(float* out_raw, float* out_gelu,
                             float_to_bf16(weight[(n_base + n) * K + k_next + k]);
                 next_w = s_w_tile_next;
             }
+            const bf16_t* next_next_w = NULL;
+            if (kt + 2 < K_tiles) {
+                int k_next2 = (kt + 2) * TILE_K;
+                for (int k = 0; k < TILE_K; k++)
+                    for (int n = 0; n < TILE_N; n++)
+                        s_w_tile_next_next[k * TILE_N + n] =
+                            float_to_bf16(weight[(n_base + n) * K + k_next2 + k]);
+                next_next_w = s_w_tile_next_next;
+            }
             for (int m = 0; m < M; m++)
                 for (int k = 0; k < TILE_K; k++)
                     s_acts_all[m * TILE_K + k] =
                         float_to_bf16(inp[m * K + k_base + k]);
-            hal_stream_tile(s_w_tile, next_w, s_acts_all, M, first_k, 0);
+            hal_stream_tile(s_w_tile, next_w, next_next_w, s_acts_all, M, first_k, 0);
         }
 
         if (K_tiles > 0) {
-            // Load this N-tile's bias values into the hardware bias SRAM.
+            // Drain the previous N-tile's async biased readback, copy raw,
+            // then do its GELU readback blocking (same bank; no bias reload needed).
+            if (rb_gelu_pending_nbase >= 0) {
+                hal_readback_sync();
+                for (int m = 0; m < M; m++)
+                    for (int n = 0; n < TILE_N; n++)
+                        out_raw[m * N + rb_gelu_pending_nbase + n] =
+                            s_result_all[m * TILE_N + n];
+                // g_accum_toggled is still true (K-tile reset blocked by g_accum_gelu_pending)
+                // so this readback uses the same bank without re-toggling.
+                hal_read_results_all_biased_gelu(s_result_all, M);
+                for (int m = 0; m < M; m++)
+                    for (int n = 0; n < TILE_N; n++)
+                        out_gelu[m * N + rb_gelu_pending_nbase + n] =
+                            s_result_all[m * TILE_N + n];
+                // Release the guard: both reads complete, next N-tile may toggle.
+                hal_readback_done();
+            }
+            // Load this N-tile's bias and start its biased readback asynchronously.
             hal_load_bias(bias + n_base, TILE_N);
-
-            // Readback 1: matmul + bias → fch (apply_bias=1, apply_gelu=0)
-            hal_read_results_all_biased(s_result_all, M);
-            for (int m = 0; m < M; m++)
-                for (int n = 0; n < TILE_N; n++)
-                    out_raw[m * N + n_base + n] = s_result_all[m * TILE_N + n];
-
-            // Readback 2: GELU(matmul+bias) → fch_gelu (apply_bias=1, apply_gelu=1)
-            hal_read_results_all_biased_gelu(s_result_all, M);
-            for (int m = 0; m < M; m++)
-                for (int n = 0; n < TILE_N; n++)
-                    out_gelu[m * N + n_base + n] = s_result_all[m * TILE_N + n];
+            hal_readback_start_biased_for_gelu(s_result_all, M);
+            rb_gelu_pending_nbase = n_base;
         }
 
         // K remainder — computed on CPU; bias applied and GELU computed in software
@@ -367,6 +422,18 @@ static void accel_matmul_gelu(float* out_raw, float* out_gelu,
                             a * weight[(n_base + n) * K + k_base + k];
                 }
         }
+    }
+
+    // Drain the final N-tile's async biased readback.
+    if (rb_gelu_pending_nbase >= 0) {
+        hal_readback_sync();
+        for (int m = 0; m < M; m++)
+            for (int n = 0; n < TILE_N; n++)
+                out_raw[m * N + rb_gelu_pending_nbase + n] = s_result_all[m * TILE_N + n];
+        hal_read_results_all_biased_gelu(s_result_all, M);
+        for (int m = 0; m < M; m++)
+            for (int n = 0; n < TILE_N; n++)
+                out_gelu[m * N + rb_gelu_pending_nbase + n] = s_result_all[m * TILE_N + n];
     }
 
     // N remainder — entirely on CPU
@@ -528,8 +595,11 @@ static void accel_matmul_backward_dinp(float* dinp, const float* dout,
     // Streaming backward: all M rows per (K-tile, N-tile) pass
     static bf16_t s_wT_tile[ACCEL_SYS_ROWS * ACCEL_SYS_COLS];
     static bf16_t s_wT_tile_next[ACCEL_SYS_ROWS * ACCEL_SYS_COLS];
+    static bf16_t s_wT_tile_next_next[ACCEL_SYS_ROWS * ACCEL_SYS_COLS];
     static bf16_t s_dout_all[256 * ACCEL_SYS_ROWS];
     static float  s_dinp_all[256 * ACCEL_SYS_COLS];
+
+    int rb_dinp_pending_kbase = -1;
 
     for (int kt = 0; kt < K_tiles; kt++) {
         int k_base = kt * TILE_N;
@@ -549,17 +619,32 @@ static void accel_matmul_backward_dinp(float* dinp, const float* dout,
                             float_to_bf16(weight[(n_next+n)*K + k_base+k]);
                 next_wT = s_wT_tile_next;
             }
+            const bf16_t* next_next_wT = NULL;
+            if (nt + 2 < N_tiles) {
+                int n_next2 = (nt + 2) * TILE_K;
+                for (int n = 0; n < TILE_K; n++)
+                    for (int k = 0; k < TILE_N; k++)
+                        s_wT_tile_next_next[n * TILE_N + k] =
+                            float_to_bf16(weight[(n_next2+n)*K + k_base+k]);
+                next_next_wT = s_wT_tile_next_next;
+            }
             for (int m = 0; m < M; m++)
                 for (int n = 0; n < TILE_K; n++)
                     s_dout_all[m * TILE_K + n] =
                         float_to_bf16(dout[m*N + n_base+n]);
-            hal_stream_tile(s_wT_tile, next_wT, s_dout_all, M, first_n, 1);
+            hal_stream_tile(s_wT_tile, next_wT, next_next_wT, s_dout_all, M, first_n, 1);
         }
         if (N_tiles > 0) {
-            hal_read_results_all(s_dinp_all, M);
-            for (int m = 0; m < M; m++)
-                for (int k = 0; k < TILE_N; k++)
-                    dinp[m*K + k_base+k] += s_dinp_all[m * TILE_N + k];
+            // Drain prev K-tile's async readback (overlapped with N-tile loop above),
+            // copy its results, then start this K-tile's readback asynchronously.
+            if (rb_dinp_pending_kbase >= 0) {
+                hal_readback_sync();
+                for (int m = 0; m < M; m++)
+                    for (int k = 0; k < TILE_N; k++)
+                        dinp[m*K + rb_dinp_pending_kbase+k] += s_dinp_all[m * TILE_N + k];
+            }
+            hal_readback_start(s_dinp_all, M);
+            rb_dinp_pending_kbase = k_base;
         }
         if (N_rem > 0) {
             int n_base = N_tiles * TILE_K;
@@ -570,6 +655,12 @@ static void accel_matmul_backward_dinp(float* dinp, const float* dout,
                         dinp[m*K + k_base+k] += d * weight[(n_base+n)*K + k_base+k];
                 }
         }
+    }
+    if (rb_dinp_pending_kbase >= 0) {
+        hal_readback_sync();
+        for (int m = 0; m < M; m++)
+            for (int k = 0; k < TILE_N; k++)
+                dinp[m*K + rb_dinp_pending_kbase+k] += s_dinp_all[m * TILE_N + k];
     }
 #else
     // Non-streaming backward (ACCEL_BACKEND_SYSTOLIC software sim)
@@ -692,6 +783,11 @@ static void accel_matmul_dweight(float* dweight, const float* inp, const float* 
     // M_sys = C (chunked ≤ 256), K_sys = M_batch (tiled by TILE_K), N_sys = OC.
     // weight_tile[k][n] = dout[(m_base+k)*OC + oc_base+n]
     // acts[ci][k]       = inp [(m_base+k)*C  + c_start+ci]
+    int rb_dw_pending  = 0;
+    int rb_dw_cstart   = 0;
+    int rb_dw_ccount   = 0;
+    int rb_dw_ocbase   = 0;
+
     for (int nt = 0; nt < OC_tiles; nt++) {
         int oc_base = nt * TILE_N;
         for (int c_start = 0; c_start < C; c_start += 256) {
@@ -712,18 +808,35 @@ static void accel_matmul_dweight(float* dweight, const float* inp, const float* 
                                 float_to_bf16(dout[(m_next + k) * OC + oc_base + n]);
                     next_w = s_w_tile_next;
                 }
+                const bf16_t* next_next_w = NULL;
+                if (kt + 2 < M_chunks) {
+                    int m_next2 = (kt + 2) * TILE_K;
+                    for (int k = 0; k < TILE_K; k++)
+                        for (int n = 0; n < TILE_N; n++)
+                            s_w_tile_next_next[k * TILE_N + n] =
+                                float_to_bf16(dout[(m_next2 + k) * OC + oc_base + n]);
+                    next_next_w = s_w_tile_next_next;
+                }
                 for (int ci = 0; ci < c_count; ci++)
                     for (int k = 0; k < TILE_K; k++)
                         s_acts_all[ci * TILE_K + k] =
                             float_to_bf16(inp[(m_base + k) * C + c_start + ci]);
-                hal_stream_tile(s_w_tile, next_w, s_acts_all, c_count, first_k, 0);
+                hal_stream_tile(s_w_tile, next_w, next_next_w, s_acts_all, c_count, first_k, 0);
             }
             if (M_chunks > 0) {
-                hal_read_results_all(s_result_all, c_count);
-                for (int ci = 0; ci < c_count; ci++)
-                    for (int n = 0; n < TILE_N; n++)
-                        dweight[(c_start + ci) * OC + oc_base + n] +=
-                            s_result_all[ci * TILE_N + n];
+                // Sync the previous pass's async readback (overlapped with kt loop above).
+                if (rb_dw_pending) {
+                    hal_readback_sync();
+                    for (int ci = 0; ci < rb_dw_ccount; ci++)
+                        for (int n = 0; n < TILE_N; n++)
+                            dweight[(rb_dw_cstart + ci) * OC + rb_dw_ocbase + n] +=
+                                s_result_all[ci * TILE_N + n];
+                }
+                hal_readback_start(s_result_all, c_count);
+                rb_dw_pending = 1;
+                rb_dw_cstart  = c_start;
+                rb_dw_ccount  = c_count;
+                rb_dw_ocbase  = oc_base;
             }
             if (M_rem > 0) {
                 int m_base = M_chunks * TILE_K;
@@ -736,6 +849,13 @@ static void accel_matmul_dweight(float* dweight, const float* inp, const float* 
                     }
             }
         }
+    }
+    if (rb_dw_pending) {
+        hal_readback_sync();
+        for (int ci = 0; ci < rb_dw_ccount; ci++)
+            for (int n = 0; n < TILE_N; n++)
+                dweight[(rb_dw_cstart + ci) * OC + rb_dw_ocbase + n] +=
+                    s_result_all[ci * TILE_N + n];
     }
 #endif
 
