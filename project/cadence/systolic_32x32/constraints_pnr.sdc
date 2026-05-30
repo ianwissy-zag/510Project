@@ -21,7 +21,7 @@ set_input_delay -clock clk -min  34 $axi_slave_inputs
 
 # ── Control inputs ────────────────────────────────────────────────────────────
 set ctrl_inputs [get_ports {
-    start mode first_k_tile fwd_buf_sel bwd_buf_sel
+    start mode first_k_tile buf_sel preload_rdy accum_buf_sel
     M_count[*] apply_bias apply_gelu
     rb_start m_axis_tready
 }]

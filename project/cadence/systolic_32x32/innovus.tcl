@@ -9,14 +9,20 @@
 # Prerequisites:
 #   outputs/sys_top_netlist.v  (produced by genus.tcl, includes retimed GELU)
 #
-# Area estimate (ASAP7 ~10M cells/mm²):
-#   Systolic array  (1024 MACs):          ~230 K µm²
-#   GELU/bias units (32 cols × gelu_unit): ~160 K µm²
-#   SRAMs + control + AXI:                ~120 K µm²
-#   Total:                              ~510 K µm²
+# Area estimate (Genus-measured, ASAP7 RVT TT):
+#   Systolic array  (1024 MACs, u_array):              ~171 K µm²
+#   Readback/GELU   (32 col instances, u_rb):           ~34 K µm²
+#   Accum SRAMs     (2× ping-pong 256×32 FP32):        ~290 K µm²
+#   Controller + AXI slave + act_stagger + bias_sram:   ~35 K µm²
+#   Total:                                             ~530 K µm²
 #
-# Floorplan: 1100×1100 µm at 45% utilisation (1210 K µm² die area).
-# Increase utilisation or die size if routing congestion is observed.
+# The double-buffered accumulator (u_accum_0 + u_accum_1) is the dominant
+# area block at ~55% of total.  Each bank is 256 rows × 32 columns × 32-bit
+# FP32 = 256 KB of register-file storage at ASAP7 cell density.
+#
+# Floorplan: 1100×1100 µm at 44% utilisation (1210 K µm² die area).
+# Routing headroom is reduced vs. the single-bank design; increase die size
+# to 1200×1200 µm (55% → 37%) if congestion is observed near the accum banks.
 # =============================================================================
 
 set script_dir    [file dirname [file normalize [info script]]]
@@ -54,11 +60,11 @@ set init_sdcfile    [list [file normalize $script_dir/constraints_pnr.sdc]]
 init_design
 
 # ── Floorplan ─────────────────────────────────────────────────────────────────
-# 1100×1100 µm die at 45% utilisation.
-# The GELU units (~160 K µm²) add ~45% to the plain 32×32 systolic area.
-# The retimed pipeline registers (3-4 stages across 32 GELU units) add
-# a small number of flip-flops — well within the 45% utilisation budget.
-floorPlan -r 1.0 0.45 2.0 2.0 2.0 2.0   ;# aspect 1.0, 45% util, 2µm margins
+# 1100×1100 µm die at 44% utilisation (~530 K µm² / 1210 K µm² die area).
+# The two ping-pong accum SRAMs (~290 K µm² combined) are the area dominant
+# blocks; place them centrally between the systolic array and the readback AXI
+# master to minimise the critical rdata bus routing distance.
+floorPlan -r 1.0 0.44 2.0 2.0 2.0 2.0   ;# aspect 1.0, 44% util, 2µm margins
 
 # ── Power distribution ────────────────────────────────────────────────────────
 addRing -nets {VDD VSS} \
@@ -81,8 +87,8 @@ file mkdir outputs
 saveDesign outputs/sys_top_placed.enc
 
 # ── Clock tree synthesis ───────────────────────────────────────────────────────
-# The retimed GELU pipeline registers are regular flip-flops on the main clock;
-# CTS treats them identically to the systolic PE registers.
+# The retimed GELU pipeline registers and the double-buffered accum write-enable
+# flops are all on the main clock; CTS treats them identically to the PE regs.
 set_db cts_buffer_cells   {BUFx4_ASAP7_75t_R BUFx6f_ASAP7_75t_R BUFx12f_ASAP7_75t_R}
 set_db cts_inverter_cells {INVx1_ASAP7_75t_R INVx2_ASAP7_75t_R INVx4_ASAP7_75t_R}
 ccopt_design
