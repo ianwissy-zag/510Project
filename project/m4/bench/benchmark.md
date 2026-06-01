@@ -62,18 +62,32 @@ The 32×32 systolic array performs one MAC per PE per cycle at 606 MHz.
 | Metric | Value |
 |---|---|
 | Peak throughput | 1,024 PEs × 606 MHz × 2 = **1,241 GFLOP/s** |
-| Forward cycles | 45,704,328 |
-| Backward cycles | 94,720,200 |
-| Total cycles | 140,424,528 |
-| Projected matmul time | **0.2317 s** |
-| Effective throughput | **563 GFLOP/s** |
-| PE utilization | **45.4%** |
+| Forward cycles | 36,154,760 |
+| Backward cycles | 71,652,808 |
+| Total cycles | 107,807,568 |
+| Projected matmul time | **0.1779 s** |
+| Effective throughput | **733 GFLOP/s** |
+| PE utilization | **59.1%** |
+| Arithmetic intensity (AXI) | **25.5 FLOP/byte** |
+| Roofline ceiling (bandwidth-bound) | **989 GFLOP/s** |
 
-The utilization gap (54.6% dead cycles) is primarily caused by weight-load stalls. Each
-32-column weight tile requires 32 AXI beats to load plus 32 LOAD_WT cycles before
-compute can begin. Because weights and activations share a single AXI-Stream bus,
-weight loading cannot be overlapped with activation streaming, leaving the PE array
-idle for roughly half of each K-tile iteration.
+Effective throughput is computed as total matmul FLOPs across the full forward +
+backward pass divided by projected hardware time:
+
+```
+throughput = total_matmul_FLOPs / hw_matmul_time
+           = (107,807,568 cycles × 2 FLOPs/cycle × utilization) / 0.1779 s
+           ≈ 733 GFLOP/s
+```
+
+The remaining utilization gap (40.9% dead cycles) is primarily caused by sequential
+weight-load stalls. Each 32-column weight tile requires 32 AXI beats to load into the
+SRAM plus 32 LOAD_WT cycles to shift into the PEs before activation streaming can begin.
+Both phases run sequentially on the shared AXI-Stream bus, leaving the PE array idle for
+a significant fraction of each K-tile iteration. The actual arithmetic intensity at the
+AXI bus (25.5 FLOP/byte) also places the kernel just below the ridge point (32
+FLOP/byte), making it bandwidth-bound with a ceiling of 989 GFLOP/s even at full bus
+utilization.
 
 ---
 
@@ -81,14 +95,14 @@ idle for roughly half of each K-tile iteration.
 
 | Metric | Software | Accelerated | Ratio |
 |---|---|---|---|
-| Matmul time | 4.5055 s | 0.2317 s | **19.4×** |
+| Matmul time | 4.5055 s | 0.1779 s | **25.3×** |
 | Non-matmul CPU time | 0.7376 s | 0.7376 s | 1.0× |
-| Total projected time | 5.2431 s | 0.9694 s | **5.41×** |
-| Accelerator fraction of total | — | 23.9% | — |
+| Total projected time | 5.2431 s | 0.9155 s | **5.73×** |
+| Accelerator fraction of total | — | 19.4% | — |
 
-The matmul-only speedup of **19.4×** reflects the accelerated portion. The
-system-level speedup of **5.41×** is lower because non-matmul work (attention,
-layernorm, optimizer) remains on the CPU and accounts for 88.4% of the projected
+The matmul-only speedup of **25.3×** reflects the accelerated portion. The
+system-level speedup of **5.73×** is lower because non-matmul work (attention,
+layernorm, optimizer) remains on the CPU and accounts for 80.6% of the projected
 runtime. By Amdahl's Law, further gains require accelerating those operations or
 reducing their share.
 
@@ -97,12 +111,16 @@ reducing their share.
 ## Energy Comparison
 
 Hardware energy is estimated from the post-synthesis power report (ASAP7 7nm RVT,
-active stimulus, register + logic):
+active stimulus, leakage + internal + switching total):
 
 ```
-hw_power  = 0.900 W  (from m4/synth/power_report.txt)
-hw_energy = hw_power × hw_matmul_time = 0.900 W × 0.2317 s = 0.2086 J
+hw_power  = 1.140 W  (from cadence/systolic_32x32/reports/power.rpt)
+hw_energy = hw_power × hw_matmul_time = 1.140 W × 0.1779 s = 0.2028 J
 ```
+
+The increase from the prior 0.900 W figure reflects the double-buffered accumulator
+SRAM (doubled switching activity) and the 20-stage FP32 GELU pipeline replacing the
+earlier 8-stage BF16 pipeline.
 
 CPU energy is measured by RAPL (package-level, accumulated over all matmul calls
 across the timed training step):
@@ -114,12 +132,12 @@ cpu_power  = 90.040 J / 4.5055 s = 19.98 W
 
 | Metric | CPU (software) | Accelerator (projected) | Ratio |
 |---|---|---|---|
-| Matmul time | 4.5055 s | 0.2317 s | 19.4× faster |
-| Power (matmul portion) | 19.98 W | 0.900 W | **22.2× lower** |
-| Energy (matmul portion) | 90.040 J | 0.2086 J | **432× lower** |
+| Matmul time | 4.5055 s | 0.1779 s | 25.3× faster |
+| Power (matmul portion) | 19.98 W | 1.140 W | **17.5× lower** |
+| Energy (matmul portion) | 90.040 J | 0.2028 J | **444× lower** |
 
-The energy reduction (432×) is the product of the power reduction (22.2×) and the
-speedup (19.4×). 
+The energy reduction (444×) is the product of the power reduction (17.5×) and the
+speedup (25.3×).
 
 ---
 

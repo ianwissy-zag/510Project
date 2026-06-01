@@ -1,187 +1,352 @@
 `timescale 1ns / 1ps
 
-// gelu_unit — Pipelined GELU(x) with Padé [3/2] tanh, max 2 bf16_mul per stage.
+// gelu_unit — Pipelined GELU(x) with Padé [3/2] tanh, one FP32 op per stage.
 //
 // GELU(x) = 0.5 · x · (1 + tanh(√(2/π) · (x + 0.044715·x³)))
-// tanh  ≈ arg·(1485 + 171·arg² + 2·arg⁴) / (1485 + 666·arg² + 26·arg⁴)
+// tanh  ≈ arg · num_inner / den
+//   num_inner = 1485 + 171·arg² + 2·arg⁴
+//   den       = 1485 + 666·arg² + 26·arg⁴
 // 1/den via bit-trick initial estimate + 2 Newton-Raphson iterations.
 //
-// Pipeline: 8 register banks (R0, R0b, R1, R1b, R2, R3, R3b, R4)
-//           plus a final combinational output stage.
-// Latency:  8 clock cycles.
+// Pipeline: 20 register banks (R1..R20), one FP32 operation per stage.
+// Latency: 20 clock cycles.
 //
-// Each pipeline interval contains at most 2 SEQUENTIAL bf16_mul levels.
-// At ~450 ps per mul plus routing overhead: ~1100-1200 ps per stage,
-// comfortably within a 1650 ps clock target.
-//
-// Stage-by-stage breakdown (sequential mul depth → approx path):
-//   Input → R0  : x², x³                            2 muls  ~900 ps
-//   R0    → R0b : cube_term, inner(add), arg         2 muls  ~900 ps
-//   R0b   → R1  : arg²                               1 mul   ~450 ps
-//   R1    → R1b : arg⁴, a171, a666   (all parallel) 1 mul   ~450 ps
-//   R1b   → R2  : a2x(1)→num_inner(add)→num(2)      2 muls  ~900 ps
-//   R2    → R3  : y0(free), xy0(1)→y1(2)            2 muls  ~900 ps
-//   R3    → R3b : xy1(1)→y2(2)                       2 muls  ~900 ps
-//   R3b   → R4  : tanh_raw, half_x   (parallel)      1 mul   ~450 ps
-//   R4    → out : tanh_val(mux), 1+tanh(add), result  1 mul   ~800 ps
+// Stage → Operation(s):
+//   S1:  x2    = x * x
+//   S2:  x3    = x * x2
+//   S3:  cube  = 0.044715 * x3
+//   S4:  inner = cube + x                             [ADD]
+//   S5:  arg   = 0.7978845608 * inner
+//   S6:  arg2  = arg * arg
+//   S7:  arg4=arg2*arg2, a171=171*arg2, a666=666*arg2 [3× parallel MUL]
+//   S8:  a2=2*arg4, a26=26*arg4                       [2× parallel MUL]
+//   S9:  tnum=1485+a171, tden=1485+a666               [2× parallel ADD]
+//   S10: num_inner=tnum+a2, den=tden+a26              [2× parallel ADD]
+//   S11: num    = arg * num_inner
+//   S12: xy0   = den * y0   (y0 = bit_trick(den), free)
+//   S13: err0  = 2.0 - xy0                            [ADD; neg is free]
+//   S14: y1    = y0 * err0
+//   S15: xy1   = den * y1
+//   S16: err1  = 2.0 - xy1                            [ADD; neg is free]
+//   S17: y2    = y1 * err1
+//   S18: tanh_raw=num*y2, half_x=0.5*x               [2× parallel MUL]
+//   S19: one_plus_tanh = 1.0 + tanh_val               [ADD; sat mux is free]
+//   S20: result = half_x * one_plus_tanh
 
 module gelu_unit (
     input  logic clk,
     input  logic rst,
 
     input  logic [31:0] x,       // FP32 input
-    output logic [31:0] result   // FP32 GELU(x), valid 8 cycles after x
+    output logic [31:0] result   // FP32 GELU(x), valid 20 cycles after x
 );
-    logic [15:0] x_bf16;
-    assign x_bf16 = x[31:16];
+    // FP32 constants
+    localparam logic [31:0] C_044715  = 32'h3D37D9AC; // 0.044715
+    localparam logic [31:0] C_SQRT2PI = 32'h3F4C422A; // sqrt(2/pi) ≈ 0.7978845608
+    localparam logic [31:0] C_171     = 32'h432B0000; // 171.0
+    localparam logic [31:0] C_666     = 32'h44268000; // 666.0
+    localparam logic [31:0] C_2       = 32'h40000000; // 2.0
+    localparam logic [31:0] C_26      = 32'h41D00000; // 26.0
+    localparam logic [31:0] C_1485    = 32'h44B9A000; // 1485.0
+    localparam logic [31:0] C_1       = 32'h3F800000; // 1.0
+    localparam logic [31:0] C_05      = 32'h3F000000; // 0.5
 
     // =========================================================================
-    // Input → R0  (x², x³ — 2 sequential muls)
+    // Stage 1: x2 = x * x
     // =========================================================================
-    logic [31:0] c0_x2, c0_x3;
-    bf16_mul u_x2 (.act_bf16(x_bf16),       .wt_bf16(x_bf16),       .product_fp32(c0_x2));
-    bf16_mul u_x3 (.act_bf16(x_bf16),       .wt_bf16(c0_x2[31:16]), .product_fp32(c0_x3));
+    logic [31:0] c1_x2;
+    fp32_mul u_s1 (.a(x), .b(x), .result(c1_x2));
 
-    logic [31:0] r0_x2, r0_x3, r0_x;
-    logic [15:0] r0_xb;
+    logic [31:0] r1_x, r1_x2;
     always_ff @(posedge clk) begin
-        if (rst) begin r0_x2<='0; r0_x3<='0; r0_x<='0; r0_xb<='0; end
-        else     begin r0_x2<=c0_x2; r0_x3<=c0_x3; r0_x<=x; r0_xb<=x_bf16; end
+        if (rst) begin r1_x <= '0; r1_x2 <= '0; end
+        else     begin r1_x <= x;  r1_x2 <= c1_x2; end
     end
 
     // =========================================================================
-    // R0 → R0b  (cube_term, inner(add), arg — 2 sequential muls)
+    // Stage 2: x3 = x * x2
     // =========================================================================
-    logic [31:0] c0b_cube, c0b_inner, c0b_arg;
-    bf16_mul      u_ct  (.act_bf16(16'h3D37),     .wt_bf16(r0_x3[31:16]),  .product_fp32(c0b_cube));
-    bf16_fp32_add u_in  (.a(c0b_cube),            .b(r0_x),                .result(c0b_inner));
-    bf16_mul      u_arg (.act_bf16(16'h3F4C),     .wt_bf16(c0b_inner[31:16]), .product_fp32(c0b_arg));
+    logic [31:0] c2_x3;
+    fp32_mul u_s2 (.a(r1_x), .b(r1_x2), .result(c2_x3));
 
-    logic [31:0] r0b_arg, r0b_x;
-    logic [15:0] r0b_xb;
+    logic [31:0] r2_x, r2_x3;
     always_ff @(posedge clk) begin
-        if (rst) begin r0b_arg<='0; r0b_x<='0; r0b_xb<='0; end
-        else     begin r0b_arg<=c0b_arg; r0b_x<=r0_x; r0b_xb<=r0_xb; end
+        if (rst) begin r2_x <= '0; r2_x3 <= '0; end
+        else     begin r2_x <= r1_x; r2_x3 <= c2_x3; end
     end
 
     // =========================================================================
-    // R0b → R1  (arg² — 1 mul; also latch sat, arg_sign, bypasses)
+    // Stage 3: cube = 0.044715 * x3
     // =========================================================================
-    logic [31:0] c1_arg2;
-    logic        c1_sat;
-    bf16_mul u_a2 (.act_bf16(r0b_arg[31:16]), .wt_bf16(r0b_arg[31:16]), .product_fp32(c1_arg2));
-    assign c1_sat = ({1'b0, r0b_arg[30:0]} >= 32'h40800000);
+    logic [31:0] c3_cube;
+    fp32_mul u_s3 (.a(C_044715), .b(r2_x3), .result(c3_cube));
 
-    logic [31:0] r1_arg2, r1_arg;
-    logic        r1_sat, r1_asign;
-    logic [15:0] r1_xb;
+    logic [31:0] r3_x, r3_cube;
     always_ff @(posedge clk) begin
-        if (rst) begin r1_arg2<='0; r1_arg<='0; r1_sat<='0; r1_asign<='0; r1_xb<='0; end
-        else     begin r1_arg2<=c1_arg2; r1_arg<=r0b_arg; r1_sat<=c1_sat;
-                       r1_asign<=r0b_arg[31]; r1_xb<=r0b_xb; end
+        if (rst) begin r3_x <= '0; r3_cube <= '0; end
+        else     begin r3_x <= r2_x; r3_cube <= c3_cube; end
     end
 
     // =========================================================================
-    // R1 → R1b  (arg⁴, a171, a666 — all parallel, 1 mul level)
+    // Stage 4: inner = cube + x  [ADD]
     // =========================================================================
-    logic [31:0] c1b_arg4, c1b_a171, c1b_a666;
-    bf16_mul u_a4  (.act_bf16(r1_arg2[31:16]), .wt_bf16(r1_arg2[31:16]), .product_fp32(c1b_arg4));
-    bf16_mul u_171 (.act_bf16(16'h432B),       .wt_bf16(r1_arg2[31:16]), .product_fp32(c1b_a171));
-    bf16_mul u_666 (.act_bf16(16'h4426),       .wt_bf16(r1_arg2[31:16]), .product_fp32(c1b_a666));
+    logic [31:0] c4_inner;
+    bf16_fp32_add u_s4 (.a(r3_cube), .b(r3_x), .result(c4_inner));
 
-    logic [31:0] r1b_arg4, r1b_a171, r1b_a666, r1b_arg;
-    logic        r1b_sat, r1b_asign;
-    logic [15:0] r1b_xb;
+    logic [31:0] r4_x, r4_inner;
     always_ff @(posedge clk) begin
-        if (rst) begin r1b_arg4<='0; r1b_a171<='0; r1b_a666<='0;
-                       r1b_arg<='0; r1b_sat<='0; r1b_asign<='0; r1b_xb<='0; end
-        else     begin r1b_arg4<=c1b_arg4; r1b_a171<=c1b_a171; r1b_a666<=c1b_a666;
-                       r1b_arg<=r1_arg; r1b_sat<=r1_sat;
-                       r1b_asign<=r1_asign; r1b_xb<=r1_xb; end
+        if (rst) begin r4_x <= '0; r4_inner <= '0; end
+        else     begin r4_x <= r3_x; r4_inner <= c4_inner; end
     end
 
     // =========================================================================
-    // R1b → R2  (a2x(1)→num_inner(add)→num(2); a26 parallel — 2 sequential muls)
+    // Stage 5: arg = SQRT2PI * inner
+    //          sat and asign captured from combinational arg
     // =========================================================================
-    logic [31:0] c2_a2x, c2_a26;
-    logic [31:0] c2_tnum, c2_ninner, c2_tden, c2_den, c2_num;
-    bf16_mul      u_2x  (.act_bf16(16'h4000), .wt_bf16(r1b_arg4[31:16]), .product_fp32(c2_a2x));
-    bf16_mul      u_26  (.act_bf16(16'h41D0), .wt_bf16(r1b_arg4[31:16]), .product_fp32(c2_a26));
-    bf16_fp32_add u_t1  (.a(32'h44B9A000), .b(r1b_a171),   .result(c2_tnum));
-    bf16_fp32_add u_ni  (.a(c2_tnum),      .b(c2_a2x),     .result(c2_ninner));
-    bf16_fp32_add u_t2  (.a(32'h44B9A000), .b(r1b_a666),   .result(c2_tden));
-    bf16_fp32_add u_dn  (.a(c2_tden),      .b(c2_a26),     .result(c2_den));
-    bf16_mul      u_nm  (.act_bf16(r1b_arg[31:16]), .wt_bf16(c2_ninner[31:16]), .product_fp32(c2_num));
+    logic [31:0] c5_arg;
+    fp32_mul u_s5 (.a(C_SQRT2PI), .b(r4_inner), .result(c5_arg));
 
-    logic [31:0] r2_den, r2_num;
-    logic        r2_sat, r2_asign;
-    logic [15:0] r2_xb;
+    logic c5_sat, c5_asign;
+    assign c5_sat   = ({1'b0, c5_arg[30:0]} >= 32'h40800000); // |arg| >= 4.0
+    assign c5_asign = c5_arg[31];
+
+    logic [31:0] r5_x, r5_arg;
+    logic        r5_sat, r5_asign;
     always_ff @(posedge clk) begin
-        if (rst) begin r2_den<='0; r2_num<='0; r2_sat<='0; r2_asign<='0; r2_xb<='0; end
-        else     begin r2_den<=c2_den; r2_num<=c2_num; r2_sat<=r1b_sat;
-                       r2_asign<=r1b_asign; r2_xb<=r1b_xb; end
+        if (rst) begin r5_x <= '0; r5_arg <= '0; r5_sat <= '0; r5_asign <= '0; end
+        else     begin r5_x <= r4_x; r5_arg <= c5_arg; r5_sat <= c5_sat; r5_asign <= c5_asign; end
     end
 
     // =========================================================================
-    // R2 → R3  (NR iter 1: y0(free), xy0(1)→err0(add)→y1(2) — 2 sequential muls)
+    // Stage 6: arg2 = arg * arg
     // =========================================================================
-    logic [31:0] c3_y0, c3_xy0, c3_neg_xy0, c3_err0, c3_y1;
-    assign c3_y0      = 32'h7EEEEEEE - {1'b0, r2_den[30:0]};
-    bf16_mul      u_m0 (.act_bf16(r2_den[31:16]), .wt_bf16(c3_y0[31:16]),   .product_fp32(c3_xy0));
-    assign c3_neg_xy0 = {~c3_xy0[31], c3_xy0[30:0]};
-    bf16_fp32_add u_a0 (.a(c3_neg_xy0), .b(32'h40000000), .result(c3_err0));
-    bf16_mul      u_m1 (.act_bf16(c3_y0[31:16]), .wt_bf16(c3_err0[31:16]),  .product_fp32(c3_y1));
+    logic [31:0] c6_arg2;
+    fp32_mul u_s6 (.a(r5_arg), .b(r5_arg), .result(c6_arg2));
 
-    logic [31:0] r3_y1, r3_den, r3_num;
-    logic        r3_sat, r3_asign;
-    logic [15:0] r3_xb;
+    logic [31:0] r6_x, r6_arg, r6_arg2;
+    logic        r6_sat, r6_asign;
     always_ff @(posedge clk) begin
-        if (rst) begin r3_y1<='0; r3_den<='0; r3_num<='0; r3_sat<='0; r3_asign<='0; r3_xb<='0; end
-        else     begin r3_y1<=c3_y1; r3_den<=r2_den; r3_num<=r2_num; r3_sat<=r2_sat;
-                       r3_asign<=r2_asign; r3_xb<=r2_xb; end
+        if (rst) begin r6_x <= '0; r6_arg <= '0; r6_arg2 <= '0; r6_sat <= '0; r6_asign <= '0; end
+        else     begin r6_x <= r5_x; r6_arg <= r5_arg; r6_arg2 <= c6_arg2;
+                       r6_sat <= r5_sat; r6_asign <= r5_asign; end
     end
 
     // =========================================================================
-    // R3 → R3b  (NR iter 2 first: xy1(1)→err1(add)→y2(2) — 2 sequential muls)
+    // Stage 7: arg4=arg2*arg2, a171=171*arg2, a666=666*arg2  [3× parallel MUL]
     // =========================================================================
-    logic [31:0] c3b_xy1, c3b_neg_xy1, c3b_err1, c3b_y2;
-    bf16_mul      u_m2 (.act_bf16(r3_den[31:16]), .wt_bf16(r3_y1[31:16]),   .product_fp32(c3b_xy1));
-    assign c3b_neg_xy1 = {~c3b_xy1[31], c3b_xy1[30:0]};
-    bf16_fp32_add u_a1 (.a(c3b_neg_xy1), .b(32'h40000000), .result(c3b_err1));
-    bf16_mul      u_m3 (.act_bf16(r3_y1[31:16]), .wt_bf16(c3b_err1[31:16]), .product_fp32(c3b_y2));
+    logic [31:0] c7_arg4, c7_a171, c7_a666;
+    fp32_mul u_s7_a4  (.a(r6_arg2), .b(r6_arg2), .result(c7_arg4));
+    fp32_mul u_s7_171 (.a(C_171),   .b(r6_arg2), .result(c7_a171));
+    fp32_mul u_s7_666 (.a(C_666),   .b(r6_arg2), .result(c7_a666));
 
-    logic [31:0] r3b_y2, r3b_num;
-    logic        r3b_sat, r3b_asign;
-    logic [15:0] r3b_xb;
+    logic [31:0] r7_x, r7_arg, r7_arg4, r7_a171, r7_a666;
+    logic        r7_sat, r7_asign;
     always_ff @(posedge clk) begin
-        if (rst) begin r3b_y2<='0; r3b_num<='0; r3b_sat<='0; r3b_asign<='0; r3b_xb<='0; end
-        else     begin r3b_y2<=c3b_y2; r3b_num<=r3_num; r3b_sat<=r3_sat;
-                       r3b_asign<=r3_asign; r3b_xb<=r3_xb; end
+        if (rst) begin r7_x <= '0; r7_arg <= '0; r7_arg4 <= '0;
+                       r7_a171 <= '0; r7_a666 <= '0; r7_sat <= '0; r7_asign <= '0; end
+        else     begin r7_x <= r6_x; r7_arg <= r6_arg; r7_arg4 <= c7_arg4;
+                       r7_a171 <= c7_a171; r7_a666 <= c7_a666;
+                       r7_sat <= r6_sat; r7_asign <= r6_asign; end
     end
 
     // =========================================================================
-    // R3b → R4  (tanh_raw, half_x — parallel, 1 mul level each)
+    // Stage 8: a2=2*arg4, a26=26*arg4  [2× parallel MUL]
     // =========================================================================
-    logic [31:0] c4_tanh_raw, c4_half_x;
-    bf16_mul u_tr (.act_bf16(r3b_num[31:16]), .wt_bf16(r3b_y2[31:16]),  .product_fp32(c4_tanh_raw));
-    bf16_mul u_hx (.act_bf16(16'h3F00),       .wt_bf16(r3b_xb),         .product_fp32(c4_half_x));
+    logic [31:0] c8_a2, c8_a26;
+    fp32_mul u_s8_2   (.a(C_2),  .b(r7_arg4), .result(c8_a2));
+    fp32_mul u_s8_26  (.a(C_26), .b(r7_arg4), .result(c8_a26));
 
-    logic [31:0] r4_tanh_raw, r4_half_x;
-    logic        r4_sat, r4_asign;
+    logic [31:0] r8_x, r8_arg, r8_a2, r8_a26, r8_a171, r8_a666;
+    logic        r8_sat, r8_asign;
     always_ff @(posedge clk) begin
-        if (rst) begin r4_tanh_raw<='0; r4_half_x<='0; r4_sat<='0; r4_asign<='0; end
-        else     begin r4_tanh_raw<=c4_tanh_raw; r4_half_x<=c4_half_x;
-                       r4_sat<=r3b_sat; r4_asign<=r3b_asign; end
+        if (rst) begin r8_x <= '0; r8_arg <= '0; r8_a2 <= '0; r8_a26 <= '0;
+                       r8_a171 <= '0; r8_a666 <= '0; r8_sat <= '0; r8_asign <= '0; end
+        else     begin r8_x <= r7_x; r8_arg <= r7_arg; r8_a2 <= c8_a2; r8_a26 <= c8_a26;
+                       r8_a171 <= r7_a171; r8_a666 <= r7_a666;
+                       r8_sat <= r7_sat; r8_asign <= r7_asign; end
     end
 
     // =========================================================================
-    // R4 → output  (tanh_val mux, 1+tanh add, result — 1 mul ~800 ps)
+    // Stage 9: tnum=1485+a171, tden=1485+a666  [2× parallel ADD]
     // =========================================================================
-    logic [31:0] tanh_val, one_plus_tanh;
-    assign tanh_val = r4_sat ? {r4_asign, 8'h7F, 23'h0} : r4_tanh_raw;
-    bf16_fp32_add u_1t (.a(32'h3F800000), .b(tanh_val),             .result(one_plus_tanh));
-    bf16_mul      u_rs (.act_bf16(r4_half_x[31:16]),
-                        .wt_bf16(one_plus_tanh[31:16]),
-                        .product_fp32(result));
+    logic [31:0] c9_tnum, c9_tden;
+    bf16_fp32_add u_s9_tn (.a(C_1485), .b(r8_a171), .result(c9_tnum));
+    bf16_fp32_add u_s9_td (.a(C_1485), .b(r8_a666), .result(c9_tden));
+
+    logic [31:0] r9_x, r9_arg, r9_a2, r9_a26, r9_tnum, r9_tden;
+    logic        r9_sat, r9_asign;
+    always_ff @(posedge clk) begin
+        if (rst) begin r9_x <= '0; r9_arg <= '0; r9_a2 <= '0; r9_a26 <= '0;
+                       r9_tnum <= '0; r9_tden <= '0; r9_sat <= '0; r9_asign <= '0; end
+        else     begin r9_x <= r8_x; r9_arg <= r8_arg; r9_a2 <= r8_a2; r9_a26 <= r8_a26;
+                       r9_tnum <= c9_tnum; r9_tden <= c9_tden;
+                       r9_sat <= r8_sat; r9_asign <= r8_asign; end
+    end
+
+    // =========================================================================
+    // Stage 10: num_inner=tnum+a2, den=tden+a26  [2× parallel ADD]
+    // =========================================================================
+    logic [31:0] c10_ninner, c10_den;
+    bf16_fp32_add u_s10_ni  (.a(r9_tnum), .b(r9_a2),  .result(c10_ninner));
+    bf16_fp32_add u_s10_den (.a(r9_tden), .b(r9_a26), .result(c10_den));
+
+    logic [31:0] r10_x, r10_arg, r10_ninner, r10_den;
+    logic        r10_sat, r10_asign;
+    always_ff @(posedge clk) begin
+        if (rst) begin r10_x <= '0; r10_arg <= '0; r10_ninner <= '0; r10_den <= '0;
+                       r10_sat <= '0; r10_asign <= '0; end
+        else     begin r10_x <= r9_x; r10_arg <= r9_arg; r10_ninner <= c10_ninner;
+                       r10_den <= c10_den; r10_sat <= r9_sat; r10_asign <= r9_asign; end
+    end
+
+    // =========================================================================
+    // Stage 11: num = arg * num_inner
+    // =========================================================================
+    logic [31:0] c11_num;
+    fp32_mul u_s11 (.a(r10_arg), .b(r10_ninner), .result(c11_num));
+
+    logic [31:0] r11_x, r11_num, r11_den;
+    logic        r11_sat, r11_asign;
+    always_ff @(posedge clk) begin
+        if (rst) begin r11_x <= '0; r11_num <= '0; r11_den <= '0;
+                       r11_sat <= '0; r11_asign <= '0; end
+        else     begin r11_x <= r10_x; r11_num <= c11_num; r11_den <= r10_den;
+                       r11_sat <= r10_sat; r11_asign <= r10_asign; end
+    end
+
+    // =========================================================================
+    // Stage 12: xy0 = den * y0   (y0 = bit-trick estimate, free)
+    // =========================================================================
+    logic [31:0] c12_y0, c12_xy0;
+    assign c12_y0  = 32'h7EEEEEEE - {1'b0, r11_den[30:0]};
+    fp32_mul u_s12 (.a(r11_den), .b(c12_y0), .result(c12_xy0));
+
+    logic [31:0] r12_x, r12_num, r12_den, r12_y0, r12_xy0;
+    logic        r12_sat, r12_asign;
+    always_ff @(posedge clk) begin
+        if (rst) begin r12_x <= '0; r12_num <= '0; r12_den <= '0;
+                       r12_y0 <= '0; r12_xy0 <= '0; r12_sat <= '0; r12_asign <= '0; end
+        else     begin r12_x <= r11_x; r12_num <= r11_num; r12_den <= r11_den;
+                       r12_y0 <= c12_y0; r12_xy0 <= c12_xy0;
+                       r12_sat <= r11_sat; r12_asign <= r11_asign; end
+    end
+
+    // =========================================================================
+    // Stage 13: err0 = 2.0 - xy0  [ADD; negation of xy0 is a free sign flip]
+    // =========================================================================
+    logic [31:0] c13_neg_xy0, c13_err0;
+    assign c13_neg_xy0 = {~r12_xy0[31], r12_xy0[30:0]};
+    bf16_fp32_add u_s13 (.a(c13_neg_xy0), .b(C_2), .result(c13_err0));
+
+    logic [31:0] r13_x, r13_num, r13_den, r13_y0, r13_err0;
+    logic        r13_sat, r13_asign;
+    always_ff @(posedge clk) begin
+        if (rst) begin r13_x <= '0; r13_num <= '0; r13_den <= '0;
+                       r13_y0 <= '0; r13_err0 <= '0; r13_sat <= '0; r13_asign <= '0; end
+        else     begin r13_x <= r12_x; r13_num <= r12_num; r13_den <= r12_den;
+                       r13_y0 <= r12_y0; r13_err0 <= c13_err0;
+                       r13_sat <= r12_sat; r13_asign <= r12_asign; end
+    end
+
+    // =========================================================================
+    // Stage 14: y1 = y0 * err0
+    // =========================================================================
+    logic [31:0] c14_y1;
+    fp32_mul u_s14 (.a(r13_y0), .b(r13_err0), .result(c14_y1));
+
+    logic [31:0] r14_x, r14_num, r14_den, r14_y1;
+    logic        r14_sat, r14_asign;
+    always_ff @(posedge clk) begin
+        if (rst) begin r14_x <= '0; r14_num <= '0; r14_den <= '0;
+                       r14_y1 <= '0; r14_sat <= '0; r14_asign <= '0; end
+        else     begin r14_x <= r13_x; r14_num <= r13_num; r14_den <= r13_den;
+                       r14_y1 <= c14_y1; r14_sat <= r13_sat; r14_asign <= r13_asign; end
+    end
+
+    // =========================================================================
+    // Stage 15: xy1 = den * y1
+    // =========================================================================
+    logic [31:0] c15_xy1;
+    fp32_mul u_s15 (.a(r14_den), .b(r14_y1), .result(c15_xy1));
+
+    logic [31:0] r15_x, r15_num, r15_y1, r15_xy1;
+    logic        r15_sat, r15_asign;
+    always_ff @(posedge clk) begin
+        if (rst) begin r15_x <= '0; r15_num <= '0; r15_y1 <= '0;
+                       r15_xy1 <= '0; r15_sat <= '0; r15_asign <= '0; end
+        else     begin r15_x <= r14_x; r15_num <= r14_num; r15_y1 <= r14_y1;
+                       r15_xy1 <= c15_xy1; r15_sat <= r14_sat; r15_asign <= r14_asign; end
+    end
+
+    // =========================================================================
+    // Stage 16: err1 = 2.0 - xy1  [ADD; negation is free]
+    // =========================================================================
+    logic [31:0] c16_neg_xy1, c16_err1;
+    assign c16_neg_xy1 = {~r15_xy1[31], r15_xy1[30:0]};
+    bf16_fp32_add u_s16 (.a(c16_neg_xy1), .b(C_2), .result(c16_err1));
+
+    logic [31:0] r16_x, r16_num, r16_y1, r16_err1;
+    logic        r16_sat, r16_asign;
+    always_ff @(posedge clk) begin
+        if (rst) begin r16_x <= '0; r16_num <= '0; r16_y1 <= '0;
+                       r16_err1 <= '0; r16_sat <= '0; r16_asign <= '0; end
+        else     begin r16_x <= r15_x; r16_num <= r15_num; r16_y1 <= r15_y1;
+                       r16_err1 <= c16_err1; r16_sat <= r15_sat; r16_asign <= r15_asign; end
+    end
+
+    // =========================================================================
+    // Stage 17: y2 = y1 * err1
+    // =========================================================================
+    logic [31:0] c17_y2;
+    fp32_mul u_s17 (.a(r16_y1), .b(r16_err1), .result(c17_y2));
+
+    logic [31:0] r17_x, r17_num, r17_y2;
+    logic        r17_sat, r17_asign;
+    always_ff @(posedge clk) begin
+        if (rst) begin r17_x <= '0; r17_num <= '0; r17_y2 <= '0;
+                       r17_sat <= '0; r17_asign <= '0; end
+        else     begin r17_x <= r16_x; r17_num <= r16_num; r17_y2 <= c17_y2;
+                       r17_sat <= r16_sat; r17_asign <= r16_asign; end
+    end
+
+    // =========================================================================
+    // Stage 18: tanh_raw=num*y2, half_x=0.5*x  [2× parallel MUL]
+    // =========================================================================
+    logic [31:0] c18_tanh_raw, c18_half_x;
+    fp32_mul u_s18_tr (.a(r17_num), .b(r17_y2),   .result(c18_tanh_raw));
+    fp32_mul u_s18_hx (.a(C_05),    .b(r17_x),    .result(c18_half_x));
+
+    logic [31:0] r18_tanh_raw, r18_half_x;
+    logic        r18_sat, r18_asign;
+    always_ff @(posedge clk) begin
+        if (rst) begin r18_tanh_raw <= '0; r18_half_x <= '0;
+                       r18_sat <= '0; r18_asign <= '0; end
+        else     begin r18_tanh_raw <= c18_tanh_raw; r18_half_x <= c18_half_x;
+                       r18_sat <= r17_sat; r18_asign <= r17_asign; end
+    end
+
+    // =========================================================================
+    // Stage 19: one_plus_tanh = 1.0 + tanh_val  [ADD; sat mux is free]
+    // =========================================================================
+    logic [31:0] c19_tanh_val, c19_opt;
+    assign c19_tanh_val = r18_sat ? {r18_asign, 8'h7F, 23'h0} : r18_tanh_raw;
+    bf16_fp32_add u_s19 (.a(C_1), .b(c19_tanh_val), .result(c19_opt));
+
+    logic [31:0] r19_half_x, r19_opt;
+    always_ff @(posedge clk) begin
+        if (rst) begin r19_half_x <= '0; r19_opt <= '0; end
+        else     begin r19_half_x <= r18_half_x; r19_opt <= c19_opt; end
+    end
+
+    // =========================================================================
+    // Stage 20: result = half_x * one_plus_tanh
+    // =========================================================================
+    logic [31:0] c20_result;
+    fp32_mul u_s20 (.a(r19_half_x), .b(r19_opt), .result(c20_result));
+
+    always_ff @(posedge clk) begin
+        if (rst) result <= '0;
+        else     result <= c20_result;
+    end
 
 endmodule

@@ -30,5 +30,7 @@ Test 15: 4 K-tiles → C=4*ROWS=128
   PASS
 Test 16: ping-pong preload (W=1 bank0 + preload W=2 bank1) → C=3*ROWS=96
   PASS
+Test 17: drain-overlap preload (skip LOAD_WT) → C=3*ROWS=96
+  PASS
 
-All 32x32 tests PASSED  (16/16)
+All 32x32 tests PASSED  (17/17)

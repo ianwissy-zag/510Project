@@ -20,8 +20,9 @@ import sys
 import os
 
 # Synthesis power for the 32×32 systolic array (ASAP7 7nm RVT, 606 MHz).
-# Source: m4/synth/power_report.txt — register + logic total, active stimulus.
-HW_SYNTH_POWER_W = 0.900371
+# Source: cadence/systolic_32x32/reports/power.rpt — leakage + internal + switching total.
+# Reflects double-buffered accumulator SRAM and 20-stage FP32 GELU pipeline.
+HW_SYNTH_POWER_W = 1.13970
 
 
 def read_timing(path):

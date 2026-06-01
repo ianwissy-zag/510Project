@@ -7,9 +7,17 @@
 #
 #   Compute core:
 #     1024 MACs (32×32 weight-stationary systolic array)
-#     LOAD_WT = 32 cycles, STREAM = M_count + ROWS + 2 cycles per K-tile
-#     act_stagger: triangular delay buffer for classical staggered M-row dataflow
-#     accum_sram:  256 × 32 FP32 accumulator across K-tiles
+#     LOAD_WT = 32 cycles; skipped when wt_preloaded_r=1 (drain-overlap path).
+#     STREAM  = M_count + ROWS + 2 cycles per K-tile.
+#     Drain-overlap: controller loads K(n+1) from weight SRAM bank ~buf_sel
+#       into PEs during K(n)'s drain phase (stream_cnt=M+1 to M+ROWS), triggered
+#       by preload_rdy.  Concurrent AXI drain-write fills K(n+2) into bank buf_sel
+#       simultaneously; independent banks prevent contention.
+#     act_stagger: triangular delay buffer for classical staggered M-row dataflow.
+#     accum_sram:  two ping-pong banks of 256×32 FP32 (double-buffered).
+#       accum_buf_sel=0 → compute writes bank0, readback reads bank1.
+#       accum_buf_sel=1 → compute writes bank1, readback reads bank0.
+#       Allows writeback of N-tile n to overlap with compute of N-tile n+1.
 #
 #   Post-processing (fused into readback pipeline):
 #     bias_sram:   32 FP32 bias values loaded via AXI (tuser=110, 2 beats)
@@ -57,6 +65,7 @@ set_db syn_opt_effort       medium
 # Hierarchical synthesis — pe (and its bf16_mac_unit) synthesised once,
 # replicated across all 32×32 = 1024 PE instances.
 # gelu_unit also synthesised once, replicated across 32 column instances.
+# accum_sram synthesised once, instantiated twice (u_accum_0/u_accum_1).
 set_db auto_ungroup         none
 
 # ── Read libraries ────────────────────────────────────────────────────────────

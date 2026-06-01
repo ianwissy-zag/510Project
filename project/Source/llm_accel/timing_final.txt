@@ -5,9 +5,9 @@
     VRL timing : timing_systolic_vrl.txt  (backend=systolic_vrl)
 
   ── Projected hardware (@ 606 MHz) ────────────────
-  Forward  matmul + GELU    :   45,704,328 cycles → 0.0754 s
-  Backward dinp + dweight   :   94,720,200 cycles → 0.1563 s
-  Total hardware            :               0.2317 s
+  Forward  matmul + GELU    :   36,154,760 cycles → 0.0597 s
+  Backward dinp + dweight   :   71,652,808 cycles → 0.1182 s
+  Total hardware            :               0.1779 s
 
   ── CPU wall time (non-matmul, from software run) ─
   attention fwd + bwd       : 0.2892 s
@@ -18,24 +18,24 @@
   [CPU matmul ref time      : 4.5055 s]
 
   ── Projected system total ───────────────────────────
-  Total (hw + CPU)          : 0.9694 s
-  Accel fraction            : 23.9%
-  CPU fraction              : 76.1%
-  Speedup vs CPU-only       : 5.41×
+  Total (hw + CPU)          : 0.9155 s
+  Accel fraction            : 19.4%
+  CPU fraction              : 80.6%
+  Speedup vs CPU-only       : 5.73×
 
   ── Accelerated-portion speedup (matmul only) ────────
   CPU matmul time           : 4.5055 s  (from software run)
-  HW matmul time (projected): 0.2317 s  (140,424,528 cycles @ 606 MHz)
-  Speedup on accel portion  : 19.44×
+  HW matmul time (projected): 0.1779 s  (107,807,568 cycles @ 606 MHz)
+  Speedup on accel portion  : 25.33×
 
   ── Power & energy (matmul portion) ──────────────────
   CPU matmul energy (RAPL)  : 90.040 J
   CPU avg power (matmul)    : 19.98 W
-  HW matmul energy (synth)  : 0.2086 J  (0.900 W × 0.2317 s)
+  HW matmul energy (synth)  : 0.2028 J  (1.140 W × 0.1779 s)
 
   ── Energy cost reduction ────────────────────────────
-  Power reduction           : 22.2×  (20.0 W → 0.900 W)
-  Energy reduction          : 432×  (90.0 J → 0.2086 J)
-  = 22.2× lower power  ×  19.4× speedup
+  Power reduction           : 17.5×  (20.0 W → 1.140 W)
+  Energy reduction          : 444×  (90.0 J → 0.2028 J)
+  = 17.5× lower power  ×  25.3× speedup
 ================================================
 

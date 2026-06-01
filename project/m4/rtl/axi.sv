@@ -5,10 +5,10 @@
 // Routes incoming 512-bit beats based on the 3-bit tuser field.
 //
 // tuser encoding:
-//   3'b000 = forward weight ping (fwd_wt_we_0)
-//   3'b001 = forward weight pong (fwd_wt_we_1)
-//   3'b010 = backward weight ping (bwd_wt_we_0)
-//   3'b011 = backward weight pong (bwd_wt_we_1)
+//   3'b000 = weight ping  (wt_we_0) — forward or backward, bank 0
+//   3'b001 = weight pong  (wt_we_1) — forward or backward, bank 1
+//   3'b010 = weight ping  (wt_we_0) — alias (backward tuser, same bank)
+//   3'b011 = weight pong  (wt_we_1) — alias (backward tuser, same bank)
 //   3'b100 = activation  (ROWS BF16 in lower 512 bits)
 //   3'b110 = bias        (16 FP32 per beat, 2 beats for COLS=32)
 //
@@ -36,15 +36,10 @@ module axi_sys #(
     output logic                  s_axis_tready,
     input  logic                  s_axis_tlast,
 
-    // Forward weight SRAMs (ping / pong)
-    output logic                        fwd_wt_we_0, fwd_wt_we_1,
-    output logic [ADDR_WIDTH-1:0]       fwd_wt_addr,
-    output logic [COLS*WT_WIDTH-1:0]    fwd_wt_data,
-
-    // Backward (transposed) weight SRAMs (ping / pong)
-    output logic                        bwd_wt_we_0, bwd_wt_we_1,
-    output logic [ADDR_WIDTH-1:0]       bwd_wt_addr,
-    output logic [COLS*WT_WIDTH-1:0]    bwd_wt_data,
+    // Weight SRAMs — shared ping/pong for forward and backward
+    output logic                        wt_we_0, wt_we_1,
+    output logic [ADDR_WIDTH-1:0]       wt_addr,
+    output logic [COLS*WT_WIDTH-1:0]    wt_data,
 
     // Activation (streaming, one beat per M row)
     output logic                        act_we_0, act_we_1,
@@ -77,26 +72,24 @@ module axi_sys #(
     end
 
     // ── Data extracts ─────────────────────────────────────────────────────────
-    assign fwd_wt_data  = s_axis_tdata[COLS*WT_WIDTH-1:0];
-    assign bwd_wt_data  = s_axis_tdata[COLS*WT_WIDTH-1:0];
-    assign fwd_wt_addr  = wt_beat[ADDR_WIDTH-1:0];
-    assign bwd_wt_addr  = wt_beat[ADDR_WIDTH-1:0];
-    assign act_data     = s_axis_tdata[ROWS*ACT_WIDTH-1:0];
-    assign bias_data    = s_axis_tdata[(COLS/2)*32-1:0];  // lower 512 bits = 16 FP32
-    assign bias_beat_sel = wt_beat[0];                     // 0 for first beat, 1 for second
+    assign wt_data       = s_axis_tdata[COLS*WT_WIDTH-1:0];
+    assign wt_addr       = wt_beat[ADDR_WIDTH-1:0];
+    assign act_data      = s_axis_tdata[ROWS*ACT_WIDTH-1:0];
+    assign bias_data     = s_axis_tdata[(COLS/2)*32-1:0];
+    assign bias_beat_sel = wt_beat[0];
 
     // ── Write-enable decode ───────────────────────────────────────────────────
+    // tuser bit[2]=0 → weight (any bank), bit[2]=1 → act or bias.
+    // tuser bit[0] selects bank 0 vs 1; bit[1] (fwd/bwd distinction) is ignored.
     logic is_weight, is_act, is_bias;
     assign is_bias   = (active_routing == 3'b110);
     assign is_act    =  active_routing[2] && !is_bias;
-    assign is_weight = !active_routing[2] && !is_bias;
+    assign is_weight = !active_routing[2];
 
-    assign fwd_wt_we_0 = handshake && is_weight && (active_routing[1:0] == 2'b00);
-    assign fwd_wt_we_1 = handshake && is_weight && (active_routing[1:0] == 2'b01);
-    assign bwd_wt_we_0 = handshake && is_weight && (active_routing[1:0] == 2'b10);
-    assign bwd_wt_we_1 = handshake && is_weight && (active_routing[1:0] == 2'b11);
-    assign act_we_0    = handshake && is_act    && !active_routing[0];
-    assign act_we_1    = handshake && is_act    &&  active_routing[0];
-    assign bias_we     = handshake && is_bias;
+    assign wt_we_0  = handshake && is_weight && !active_routing[0];
+    assign wt_we_1  = handshake && is_weight &&  active_routing[0];
+    assign act_we_0 = handshake && is_act    && !active_routing[0];
+    assign act_we_1 = handshake && is_act    &&  active_routing[0];
+    assign bias_we  = handshake && is_bias;
 
 endmodule

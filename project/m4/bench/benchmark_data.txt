@@ -1,32 +1,35 @@
 backend=software
 B=4
 T=64
-fwd_total_s=1.131601
-bwd_total_s=3.900215
-other_s=0.955441
-matmul_s=4.225683
-attention_s=0.293055
-layernorm_s=0.028825
-gelu_bwd_s=0.040315
+fwd_total_s=1.929382
+bwd_total_s=3.135532
+other_s=0.178234
+matmul_s=4.505519
+attention_s=0.289241
+layernorm_s=0.020175
+gelu_bwd_s=0.056822
 vrl_matmul_s=0.000000
 hw_cycles_fwd=0
-hw_cycles_bwd=0
+hw_cycles_bwd=090
 clock_hz=606000000
+matmul_energy_j=90.040352
 
 backend=systolic_vrl
 B=4
 T=64
-fwd_total_s=1359.752382
-bwd_total_s=2767.181818
-other_s=1.261196
-matmul_s=4125.632251
-attention_s=0.402106
-layernorm_s=0.038867
-gelu_bwd_s=0.396973
-vrl_matmul_s=4125.585165
-hw_cycles_fwd=45704328
-hw_cycles_bwd=94720200
+fwd_total_s=1274.203463
+bwd_total_s=2516.744391
+other_s=3.889264
+matmul_s=3788.799795
+attention_s=0.420621
+layernorm_s=0.039217
+gelu_bwd_s=0.396490
+vrl_matmul_s=3788.743978
+hw_cycles_fwd=36154760
+hw_cycles_bwd=71652808
 clock_hz=606000000
+matmul_energy_j=-1
+
 
 
 === Combined timing projection (B=4 T=64) ===
@@ -35,9 +38,9 @@ clock_hz=606000000
     VRL timing : timing_systolic_vrl.txt  (backend=systolic_vrl)
 
   ── Projected hardware (@ 606 MHz) ────────────────
-  Forward  matmul + GELU    :   45,704,328 cycles → 0.0754 s
-  Backward dinp + dweight   :   94,720,200 cycles → 0.1563 s
-  Total hardware            :               0.2317 s
+  Forward  matmul + GELU    :   36,154,760 cycles → 0.0597 s
+  Backward dinp + dweight   :   71,652,808 cycles → 0.1182 s
+  Total hardware            :               0.1779 s
 
   ── CPU wall time (non-matmul, from software run) ─
   attention fwd + bwd       : 0.2892 s
@@ -48,24 +51,24 @@ clock_hz=606000000
   [CPU matmul ref time      : 4.5055 s]
 
   ── Projected system total ───────────────────────────
-  Total (hw + CPU)          : 0.9694 s
-  Accel fraction            : 23.9%
-  CPU fraction              : 76.1%
-  Speedup vs CPU-only       : 5.41×
+  Total (hw + CPU)          : 0.9155 s
+  Accel fraction            : 19.4%
+  CPU fraction              : 80.6%
+  Speedup vs CPU-only       : 5.73×
 
   ── Accelerated-portion speedup (matmul only) ────────
   CPU matmul time           : 4.5055 s  (from software run)
-  HW matmul time (projected): 0.2317 s  (140,424,528 cycles @ 606 MHz)
-  Speedup on accel portion  : 19.44×
+  HW matmul time (projected): 0.1779 s  (107,807,568 cycles @ 606 MHz)
+  Speedup on accel portion  : 25.33×
 
   ── Power & energy (matmul portion) ──────────────────
   CPU matmul energy (RAPL)  : 90.040 J
   CPU avg power (matmul)    : 19.98 W
-  HW matmul energy (synth)  : 0.2086 J  (0.900 W × 0.2317 s)
+  HW matmul energy (synth)  : 0.2028 J  (1.140 W × 0.1779 s)
 
   ── Energy cost reduction ────────────────────────────
-  Power reduction           : 22.2×  (20.0 W → 0.900 W)
-  Energy reduction          : 432×  (90.0 J → 0.2086 J)
-  = 22.2× lower power  ×  19.4× speedup
+  Power reduction           : 17.5×  (20.0 W → 1.140 W)
+  Energy reduction          : 444×  (90.0 J → 0.2028 J)
+  = 17.5× lower power  ×  25.3× speedup
 ================================================
 
