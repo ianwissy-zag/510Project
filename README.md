@@ -4,9 +4,22 @@ Ian Wyse — ECE 510 Spring 2026
 
 ## Summary
 
-Custom ASIC accelerator for the GEMM kernel that accounts for 86% of GPT-2 training runtime. The final design is a 32×32 BF16 weight-stationary systolic array targeting ASAP7 7nm at 606 MHz, delivering 563 GFLOP/s effective throughput with a 432× energy reduction over the CPU baseline. All 16 directed simulation tests pass; synthesis yields 0.385 mm² at 0.900 W with 154 minor timing violations confined to the GELU post-processing pipeline (WNS = −0.9 ps).
+Custom ASIC accelerator for the GEMM kernel that accounts for 86% of GPT-2 training runtime. The final design is a 32×32 BF16 weight-stationary systolic array targeting ASAP7 7nm at 606 MHz, delivering 733 GFLOP/s effective throughput with a 444× energy reduction over the CPU baseline. All 17 directed simulation tests pass; synthesis yields 0.533 mm² at 1.140 W with timing fully closed (WNS = 0 ps, 0 violations).
 
 **[M4 Milestone deliverables →](project/m4/README.md)**
+
+---
+
+## M4 Checklist Deviations
+
+The M4 checklist assumes an OpenLane 2 / SystemVerilog simulation flow. This project uses Cadence Genus/Innovus and Verilator instead, producing equivalent artifacts at different paths and filenames. Each deviation is intentional, documented in `project/m4/README.md`, and has a functional equivalent committed to the repository.
+
+| Checklist path | Committed path | Reason |
+|---|---|---|
+| `project/m4/synth/config.json` | `project/m4/synth/genus.tcl` | Cadence Genus used in place of OpenLane 2. ASAP7 is not natively supported by OpenLane 2, and synthesis was performed on a CentOS 7 server with the Cadence toolchain. `genus.tcl` is the complete, self-contained synthesis configuration equivalent. |
+| `project/m4/synth/openlane_run.log` | `project/m4/synth/genus.log` | Full Cadence Genus run log capturing all synthesis passes (`syn_generic`, `syn_map`, `syn_opt`). Functionally equivalent to an OpenLane run log. |
+| `project/m4/tb/tb_top.sv` | `project/m4/tb/tb_top.cpp` | Testbench is written in C++ for Verilator, which compiles the SystemVerilog RTL into a cycle-accurate C++ model. A `.sv` testbench would require a commercial SV simulator not available in this environment. |
+| `project/m4/bench/benchmark_data.csv` | `project/m4/bench/benchmark_data.txt` | Raw timing data is stored as key=value pairs (plain text). All numbers reported in `benchmark.md` trace directly to this file. |
 
 ---
 

@@ -38,24 +38,11 @@ set init_lef_file   [list \
     $asap7_tef_dir/asap7_tech_1x_201209.lef \
     $asap7_lef_dir/asap7sc7p5t_28_R_1x_220121a.lef]
 
-# Setup corner: slow-slow
-set init_lib        [list \
-    $asap7_lib_dir/asap7sc7p5t_SIMPLE_RVT_SS_nldm_211120.lib \
-    $asap7_lib_dir/asap7sc7p5t_INVBUF_RVT_SS_nldm_220122.lib \
-    $asap7_lib_dir/asap7sc7p5t_SEQ_RVT_SS_nldm_220123.lib \
-    $asap7_lib_dir/asap7sc7p5t_AO_RVT_SS_nldm_211120.lib \
-    $asap7_lib_dir/asap7sc7p5t_OA_RVT_SS_nldm_211120.lib]
-
-# Hold corner: fast-fast
-set init_min_lib    [list \
-    $asap7_lib_dir/asap7sc7p5t_SIMPLE_RVT_FF_nldm_211120.lib \
-    $asap7_lib_dir/asap7sc7p5t_INVBUF_RVT_FF_nldm_220122.lib \
-    $asap7_lib_dir/asap7sc7p5t_SEQ_RVT_FF_nldm_220123.lib \
-    $asap7_lib_dir/asap7sc7p5t_AO_RVT_FF_nldm_211120.lib \
-    $asap7_lib_dir/asap7sc7p5t_OA_RVT_FF_nldm_211120.lib]
-
-set init_max_lib    $init_lib
-set init_sdcfile    [list [file normalize $script_dir/constraints_pnr.sdc]]
+# MMMC file defines all corners, delay corners, constraint modes, and analysis
+# views.  Must be set before init_design so ccopt_design has corners available.
+# init_sdcfile is intentionally omitted — the SDC is referenced inside mmmc.tcl
+# via create_constraint_mode to avoid double-loading and corner conflicts.
+set init_mmmc_file  [file normalize $script_dir/mmmc.tcl]
 
 init_design
 
