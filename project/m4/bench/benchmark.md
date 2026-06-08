@@ -80,15 +80,6 @@ throughput = total_matmul_FLOPs / hw_matmul_time
            ≈ 733 GFLOP/s
 ```
 
-The remaining utilization gap (40.9% dead cycles) is primarily caused by sequential
-weight-load stalls. Each 32-column weight tile requires 32 AXI beats to load into the
-SRAM plus 32 LOAD_WT cycles to shift into the PEs before activation streaming can begin.
-Both phases run sequentially on the shared AXI-Stream bus, leaving the PE array idle for
-a significant fraction of each K-tile iteration. The actual arithmetic intensity at the
-AXI bus (25.5 FLOP/byte) also places the kernel just below the ridge point (32
-FLOP/byte), making it bandwidth-bound with a ceiling of 989 GFLOP/s even at full bus
-utilization.
-
 ---
 
 ## Speedup Over Software Baseline
